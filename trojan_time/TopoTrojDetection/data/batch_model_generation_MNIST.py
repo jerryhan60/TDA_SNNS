@@ -14,7 +14,8 @@ if __name__=='__main__':
     # Specify data generation configuration
     TOP_DIR: str =  "./data"                    # Top level directory that is used to hold all Trojaned models
     CLEAN_DATA_DIR: str = "./data/clean_data"   # Folder that holds the clean input images. Put your clean MNIST dataset here
-    LOG_FILE: str = "./data/log"                # Log file name
+    # LOG_FILE: str = "./data/log"                # Log file name
+    LOG_FILE = "../newlog"
     TENSORBOARD_DIR: str = "./data/tensorboard" # Tensorboard directory
 
     parser = argparse.ArgumentParser(description='MNIST Data Generation and Model Training')
@@ -42,16 +43,20 @@ if __name__=='__main__':
         model_name="id-"+str(i).zfill(8)
         model_folder=os.path.join(TOP_DIR, model_name)
         if os.path.exists(model_folder):
+            print("already exists, skipping model")
             continue
 
         a.experiment_path = os.path.abspath(os.path.join(model_folder))                         # Top level dir
         a.models_output = os.path.abspath(os.path.join(model_folder))                           # DIR to hold model's .pt file
         a.log = os.path.abspath(LOG_FILE)                                                       # Log file path
-        a.train = os.path.abspath(os.path.join(TOP_DIR, model_name, '/data/clean/train.csv'))   # Folder contains experiment training set
-        a.test = os.path.abspath(os.path.join(TOP_DIR, model_name, '/data/clean/test.csv'))     # Folder contains experiment testing set
+        a.train = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'))   # Folder contains experiment training set
+        a.test = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/test.csv'))     # Folder contains experiment testing set
         a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, model_name, 'mnist_clean/train_mnist.csv'))
         a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  model_name, 'mnist_clean/test_mnist.csv'))
         a.models_output = os.path.abspath(os.path.join(TOP_DIR, model_name))
+        # print("top_dir", TOP_DIR, "model name", model_name)
+        # print("hhhhat", os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'), "train", a.train)
+        # exit(0)
 
         kwargs=a._get_kwargs()
         prefix='python gen_and_train_MNIST.py '

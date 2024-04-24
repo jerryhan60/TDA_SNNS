@@ -1,0 +1,15 @@
+[2024-04-24 19:35:27,233] INFO in experiment: Creating experiment from clean_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean/train_mnist.csv modified_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean
+[2024-04-24 19:35:27,314] INFO in experiment: Using all data points in /n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean for experiment
+[2024-04-24 19:35:27,497] INFO in experiment: Creating experiment from clean_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean/test_mnist.csv modified_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean
+[2024-04-24 19:35:27,513] INFO in experiment: Using all data points in /n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean for experiment
+[2024-04-24 19:35:27,553] INFO in experiment: Creating experiment from clean_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean/train_mnist.csv modified_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_triggered_reverselambda
+[2024-04-24 19:35:27,677] INFO in experiment: Created stratified dataset from /n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_triggered_reverselambda for including in experiment
+[2024-04-24 19:35:45,834] INFO in experiment: Creating experiment from clean_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_clean/test_mnist.csv modified_data:/n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_triggered_reverselambda
+[2024-04-24 19:35:45,860] INFO in experiment: Created stratified dataset from /n/fs/pvl-objslam/undergrads/cos485/TDA_SNNS/trojan_time/TopoTrojDetection/data/data/id-00000006/mnist_triggered_reverselambda for including in experiment
+[2024-04-24 19:35:47,113] WARNING in default_optimizer: Overriding num_epochs_per_metrics due to early-stopping or saving-best-model!
+[2024-04-24 19:35:47,117] INFO in default_optimizer: {'batch_size':20, 'num_epochs':20, 'device':'cuda', 'lr':1.00000e-04, 'loss_function':'cross_entropy_loss', 'optimizer':'adam'}
+[2024-04-24 19:35:47,118] INFO in default_optimizer: Optimizer[adam] Configured as: loss[CrossEntropyLoss()], learning-rate[1.00000e-04], batch-size[20] num-epochs[20] Device[cuda]
+[2024-04-24 19:35:47,118] INFO in default_optimizer: Reporting Configured as: num_batches_per_log_message[500] tensorboard_dir[tensorboard_dir/]
+[2024-04-24 19:35:47,118] INFO in default_optimizer: Metrics capturing configured as: num_epochs_per_metric[1] num_batches_per_epoch_per_metric[500]
+[2024-04-24 19:35:47,120] INFO in data_manager: Loading Training Dataset
+[2024-04-24 19:35:47,609] INFO in runner: Attempting to use 1 GPUs for training!

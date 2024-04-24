@@ -12,7 +12,8 @@ import pandas as pd
 from tqdm import tqdm
 
 MNIST_IMG_SHAPE = (28, 28)
-datasets_url = 'http://yann.lecun.com/exdb/mnist/'
+# datasets_url = 'http://yann.lecun.com/exdb/mnist/'
+datasets_url ='https://github.com/golbin/TensorFlow-MNIST/raw/master/mnist/data/'
 logger = logging.getLogger(__name__)
 
 """
@@ -33,6 +34,9 @@ def convert(imgf, labelf, outf, n, description='mnist_convert', verbose=True):
     :param verbose: if True, status bar is displayed to show progress of converting file
     :return: None
     """
+    print(imgf, labelf, outf, n)
+    # exit(0)
+
     f = open(imgf, "rb")
     o = open(outf, "w")
     l = open(labelf, "rb")

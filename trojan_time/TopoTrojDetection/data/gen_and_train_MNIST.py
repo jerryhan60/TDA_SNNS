@@ -205,6 +205,8 @@ def train_and_save_mnist_model(experiment_path,
                                use_gpu,
                                a):
     logger.info("Training Model...")
+    print("Training Model...Training Model...Training Model...Training Model...Training Model...")
+    # exit(0)
 
     def img_transform(x):
         return x.unsqueeze(0)
