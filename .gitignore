@@ -24,6 +24,7 @@ pyvenv.cfg
 sdist/
 var/
 wheels/
+share/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
