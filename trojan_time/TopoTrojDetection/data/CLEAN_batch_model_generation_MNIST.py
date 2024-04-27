@@ -40,7 +40,7 @@ if __name__=='__main__':
 
     processes=[]
     for i in range(a.num_models):
-        model_name="id-"+str(i).zfill(8)
+        model_name="CLEAN_id-"+str(i).zfill(8)
         model_folder=os.path.join(TOP_DIR, model_name)
         if os.path.exists(model_folder):
             print("already exists, skipping model")
@@ -52,14 +52,14 @@ if __name__=='__main__':
         #a.train = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'))   # Folder contains experiment training set
         #a.test = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/test.csv'))     # Folder contains experiment testing set
 
-        a.train = os.path.abspath(os.path.join(TOP_DIR, 'new_data/clean/train.csv'))   # Folder contains experiment training set
-        a.test = os.path.abspath(os.path.join(TOP_DIR, 'new_data/clean/test.csv'))     # Folder contains experiment testing set
+        a.train = os.path.abspath(os.path.join(TOP_DIR, 'clean_new_data/clean/train.csv'))   # Folder contains experiment training set
+        a.test = os.path.abspath(os.path.join(TOP_DIR,  'clean_new_data/clean/test.csv'))     # Folder contains experiment testing set
 
         #a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, model_name, 'mnist_clean/train_mnist.csv'))
         #a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  model_name, 'mnist_clean/test_mnist.csv'))
 
-        a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, 'new_mnist_clean/train_mnist.csv'))
-        a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  'new_mnist_clean/test_mnist.csv'))
+        a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, 'clean_new_mnist_clean/train_mnist.csv'))
+        a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  'clean_new_mnist_clean/test_mnist.csv'))
 
         a.models_output = os.path.abspath(os.path.join(TOP_DIR, model_name))
         # print("top_dir", TOP_DIR, "model name", model_name)
@@ -67,7 +67,7 @@ if __name__=='__main__':
         # exit(0)
 
         kwargs=a._get_kwargs()
-        prefix='python gen_and_train_MNIST.py '
+        prefix='python CLEAN_gen_and_train_MNIST.py '
         arg_string=' '.join(['--'+str(x[0])+'='+str(x[1]) for x in kwargs[1:] if not (str(x[0]) in ['gpu', 'parallel'])])
         if ('gpu' in [str(x[0]) for x in kwargs]):
             arg_string+=' --gpu'
