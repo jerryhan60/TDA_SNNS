@@ -32,7 +32,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 import warnings
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
+
 
 
 # Algorithm Configuration
@@ -50,141 +52,150 @@ INPUT_RANGE: List = [0, 255]   # Input image range
 TRAIN_TEST_SPLIT: float = 0.8  # Ratio of train to test
 
 
-def process_model(j, model_list, gt_list, fv_list, gt_list_lock, fv_list_lock, root, device, psf_config):
-    model_name = model_list[j]
-    model_file_path = []
-    model_config_path = []
-    model_train_example_config = None
-    gt_file = None
-    USE_EXAMPLE = True
-
-
-    """for root_m, dirnames, filenames in os.walk(os.path.join(root, model_name)):
-        for filename in filenames:
-            if filename.endswith('.pt'):
-                model_file_path = os.path.join(root_m, filename)
-            if filename.endswith('ground_truth.csv'):
-                gt_file = os.path.join(root_m, filename)
-            if filename.endswith('config.json'):
-                model_config_path = os.path.join(root_m, filename)
-            if filename.endswith('experiment_train.csv'):
-                model_train_example_config = os.path.join(root_m, filename) # TODO
-        if len(model_file_path) and len(model_config_path) and model_train_example_config:
-            break
-    """
-    model_file_path = os.path.join(root, model_name, "model.pt")
-    gt_file = os.path.join(root, model_name, "ground_truth.csv")
-    model_train_example_config = os.path.join(
-            root,
-            model_name,
-            "clean-example-data",
-            "data.csv")
-    model_stats_file = os.path.join(root, model_name, "model_stats.json")
-    # load the model stats
+# def process_model(j, model_list, gt_list, fv_list, gt_list_lock, fv_list_lock, root, device, psf_config):
+def process_model(args):
     try:
-        model_stats = json.load(open(model_stats_file, "r"))
-        if model_stats["name"] == "inceptionv3":
-            logging.info("Skipping model {} as it is inceptionv3".format(model_name))
+        j, model_list, gt_list, fv_list, root, device, psf_config = args
+
+        model_name = model_list[j]
+        model_file_path = []
+        model_config_path = []
+        model_train_example_config = None
+        gt_file = None
+        USE_EXAMPLE = True
+
+
+        """for root_m, dirnames, filenames in os.walk(os.path.join(root, model_name)):
+            for filename in filenames:
+                if filename.endswith('.pt'):
+                    model_file_path = os.path.join(root_m, filename)
+                if filename.endswith('ground_truth.csv'):
+                    gt_file = os.path.join(root_m, filename)
+                if filename.endswith('config.json'):
+                    model_config_path = os.path.join(root_m, filename)
+                if filename.endswith('experiment_train.csv'):
+                    model_train_example_config = os.path.join(root_m, filename) # TODO
+            if len(model_file_path) and len(model_config_path) and model_train_example_config:
+                break
+        """
+        model_file_path = os.path.join(root, model_name, "model.pt")
+        gt_file = os.path.join(root, model_name, "ground_truth.csv")
+        model_train_example_config = os.path.join(
+                root,
+                model_name,
+                "clean-example-data",
+                "data.csv")
+        model_stats_file = os.path.join(root, model_name, "model_stats.json")
+        # load the model stats
+        try:
+            model_stats = json.load(open(model_stats_file, "r"))
+            if model_stats["name"] == "inceptionv3":
+                logging.info("Skipping model {} as it is inceptionv3".format(model_name))
+                return
+        except:
+            logging.error("err loading model stats".format(model_name))
             return
-    except:
-        logging.error("err loading model stats".format(model_name))
-        return
 
-    try:
-        model_file_path = model_file_path
-        model = torch.load(model_file_path, map_location=device).to(device)
-    except Exception as e:
-        logging.error("err loading {} skipping to next model".format(model_name))
-        print(e)
-        return
+        try:
+            model_file_path = model_file_path
+            model = torch.load(model_file_path, map_location=device).to(device)
+        except Exception as e:
+            logging.error("err loading {} skipping to next model".format(model_name))
+            print(e)
+            return
 
-    model.eval()
+        model.eval()
 
-    # try:
-    #     model_config = jsonpickle.decode(open(model_config_path, "r").read())
-    # except:
-    #     print("Model {} config is missing, skip to next model".format(model_config))
-    #     continue
+        # try:
+        #     model_config = jsonpickle.decode(open(model_config_path, "r").read())
+        # except:
+        #     print("Model {} config is missing, skip to next model".format(model_config))
+        #     continue
 
-    # read the gt file, which is a csv with one value in it
-    with open(gt_file, 'r') as f:
-        gt = f.read()
-    f.close()
+        # read the gt file, which is a csv with one value in it
+        with open(gt_file, 'r') as f:
+            gt = f.read()
+        f.close()
 
-    # else:
-    #     gt = ('final_triggered_data_n_total' in model_config.keys())
+        # else:
+        #     gt = ('final_triggered_data_n_total' in model_config.keys())
 
-    with gt_list_lock:
         gt_list.append(gt)
 
-    # gt_list.append(gt)
+        # gt_list.append(gt)
 
-    img_c = None
-    total_examples = 1 # Default to be a blank image if USE_EXAMPLE=False
-    # If use_examples then read in clean input example images
-    if USE_EXAMPLE and os.path.exists(model_train_example_config):
-        img_c = defaultdict(list)
-        example_file = pd.read_csv(model_train_example_config)
-        example_file.sample(frac=1) # this just shuffles
+        img_c = None
+        total_examples = 1 # Default to be a blank image if USE_EXAMPLE=False
+        # If use_examples then read in clean input example images
+        if USE_EXAMPLE and os.path.exists(model_train_example_config):
+            img_c = defaultdict(list)
+            example_file = pd.read_csv(model_train_example_config)
+            example_file.sample(frac=1) # this just shuffles
 
-        n_classes = len(example_file['true_label'].unique())
+            n_classes = len(example_file['true_label'].unique())
 
-        for ind in range(example_file.shape[0]):
+            for ind in range(example_file.shape[0]):
 
-            # if example_file['triggered'].iloc[ind]:
-            #     continue
+                # if example_file['triggered'].iloc[ind]:
+                #     continue
 
-            c = example_file['true_label'].iloc[ind]
+                c = example_file['true_label'].iloc[ind]
 
-            if not len(img_c[c]):
-                logging.info(f"Extracting images for class {c}")
-                img_file=glob.glob(
-                        os.path.join(
-                            root,
-                            model_name,
-                            '**',
-                            example_file['file'].iloc[ind]
-                            ),
-                    recursive=True)[0]
+                if not len(img_c[c]):
+                    logging.info(f"Extracting images for class {c}")
+                    img_file=glob.glob(
+                            os.path.join(
+                                root,
+                                model_name,
+                                '**',
+                                example_file['file'].iloc[ind]
+                                ),
+                        recursive=True)[0]
 
-                img = torch.from_numpy(cv2.imread(img_file, cv2.IMREAD_UNCHANGED)).float()
-                img_c[c].append(img.permute(2,0,1).unsqueeze(0))
+                    img = torch.from_numpy(cv2.imread(img_file, cv2.IMREAD_UNCHANGED)).float()
+                    img_c[c].append(img.permute(2,0,1).unsqueeze(0))
 
-            total_examples = sum([len(img_c[c]) for c in img_c])
+                total_examples = sum([len(img_c[c]) for c in img_c])
 
-            if len(img_c.keys()) == n_classes and total_examples == n_classes:
-                break
+                if len(img_c.keys()) == n_classes and total_examples == n_classes:
+                    break
 
-    # model_file_path_prefix = '/'.join(model_file_path.split('/')[:-1])
-    # save_file_path = os.path.join(model_file_path_prefix, 'test_extracted_psf_topo_feature.pkl')
+        # model_file_path_prefix = '/'.join(model_file_path.split('/')[:-1])
+        # save_file_path = os.path.join(model_file_path_prefix, 'test_extracted_psf_topo_feature.pkl')
 
-    save_file_dir = os.path.join(
-            os.path.dirname(root),
-            "calculated_features_cache",
-            model_name
-            )
+        save_file_dir = os.path.join(
+                os.path.dirname(root),
+                "calculated_features_cache",
+                model_name
+                )
 
-    save_file_path = os.path.join(
-            save_file_dir,
-            "fv.pkl",
-            )
+        save_file_path = os.path.join(
+                save_file_dir,
+                "fv.pkl",
+                )
 
-    if not os.path.exists(save_file_dir):
-        os.makedirs(save_file_dir)
+        if not os.path.exists(save_file_dir):
+            os.makedirs(save_file_dir)
 
-    fv = topo_psf_feature_extract(model, img_c, psf_config, cache_dir=save_file_dir)
-    with open(save_file_path, 'wb') as f:
-        pkl.dump(fv, f)
-    f.close()
+        fv = topo_psf_feature_extract(model, img_c, psf_config, cache_dir=save_file_dir)
+        with open(save_file_path, 'wb') as f:
+            pkl.dump(fv, f)
+        f.close()
 
-    with fv_list_lock:
+        # with fv_list_lock:
+            # fv_list.append(fv)
+
         fv_list.append(fv)
+        # fv_list[i]['psf_feature_pos'] shape: 2 * nExample * fh * fw * nStimLevel * nClasses
 
-    # fv_list.append(fv)
-    # fv_list[i]['psf_feature_pos'] shape: 2 * nExample * fh * fw * nStimLevel * nClasses
+    except Exception as e:
+        logging.error(f"Error processing model {model_name}: {e}")
+        # Optionally return an error message or status
 
 
 def main(args):
+
+    multiprocessing.set_start_method('spawn', force=True)
 
     seed = args.seed
     random.seed(seed)
@@ -216,29 +227,48 @@ def main(args):
     # --------------------------------- Step I: Feature Extraction ---------------------------------
     print(">>> Step I: Feature Extraction <<<")
 
-    gt_list = []
-    fv_list = []
-    gt_list_lock = threading.Lock()
-    fv_list_lock = threading.Lock()
+    # gt_list = []
+    # fv_list = []
+    # gt_list_lock = threading.Lock()
+    # fv_list_lock = threading.Lock()
 
     # for j in tqdm(range(len(model_list)), ncols=50, ascii=True):
+    manager = multiprocessing.Manager()
+    gt_list = manager.list()
+    fv_list = manager.list()
 
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    params = [(j, model_list, gt_list, fv_list, root, device, psf_config) for j in range(len(model_list))]
 
-        futures = [
-                executor.submit(
-                    process_model, j, model_list,
-                    gt_list, fv_list, gt_list_lock, fv_list_lock,
-                    root, device, psf_config)
-                for j in range(len(model_list))]
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        results = list(tqdm(pool.imap(process_model, params), total=len(model_list)))
 
-        for future in tqdm(as_completed(futures), total=len(model_list), ncols=50, ascii=True):
-            try:
-                future.result()
-            except Exception as e:
-                logging.error("err in future {}".format(e))
+    # Check results for errors if your function returns status messages
+    errors = [res for res in results if res is not None]
+    if errors:
+        logging.error(f"whoops errs {errors}")
+    else:
+        logging.info("all models processed successfully!!")
 
-    exit()
+
+
+    """
+        with ThreadPoolExecutor(max_workers=20) as executor:
+
+            futures = [
+                    executor.submit(
+                        process_model, j, model_list,
+                        gt_list, fv_list, gt_list_lock, fv_list_lock,
+                        root, device, psf_config)
+                    for j in range(len(model_list))]
+
+            for future in tqdm(as_completed(futures), total=len(model_list), ncols=50, ascii=True):
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.error("err in future {}".format(e))
+    """
+
+    return
 
     # --------------------------------- Step II: Train Classifier ---------------------------------
     print(">>> Step II: Train Classifier <<<")
