@@ -51,7 +51,7 @@ def xgb_crossval(p):
         dtest = xgb.DMatrix(test_set, label=test_y)
         evallist = [(dtest, 'eval'), (dtrain, 'train')]
 
-        bst = xgb.train(param, dtrain, num_epochs, evallist, verbose_eval=False)
+        bst = xgb.train(param, dtrain, num_epochs, evals=evallist, verbose_eval=False)
         y_pred = bst.predict(dtest)
         soft_pred = y_pred
         # Record accuracy and cross entropy
