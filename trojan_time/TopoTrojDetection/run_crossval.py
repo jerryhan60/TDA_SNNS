@@ -26,7 +26,11 @@ def xgb_crossval(p):
 
     import xgboost as xgb # Need to import here for HPO
     feature, gt_labels, max_depth, eta, gamma, lamb, alpha=p
-    param = {'objective': 'binary:logistic', 'nthread': 20, 'eval_metric':'auc'}
+    param = {
+            'objective': 'binary:logistic',
+            'nthread': 20,
+            'eval_metric':'error'
+            }
     param['max_depth']=int(max_depth)
     param['eta']=eta
     param['gamma']=gamma
@@ -35,6 +39,7 @@ def xgb_crossval(p):
 
     ################ added ################
     param['subsample']=0.8
+    # param['colsample_bytree']=0.8
 
     acc = []
     auc = []
@@ -48,6 +53,9 @@ def xgb_crossval(p):
     kf.get_n_splits(feature)
     for train_index, test_index in kf.split(feature):
         train_set, test_set = feature[train_index], feature[test_index]
+
+        print(feature[train_index])
+        print(feature[train_index].shape)
         train_y, test_y = gt_labels[train_index], gt_labels[test_index]
         # Create sparse matrix for xgboost pipeline
         dtrain = xgb.DMatrix(train_set, label=train_y)
@@ -67,6 +75,8 @@ def xgb_crossval(p):
         xgb_list.append(bst)
         fold_ind += 1
 
+        print('Fold [{}|{}] - Acc {:.3f}% - AUC {:.3f} - CE {:.3f}'.format(fold, fold_ind, acc_temp*100, auc_temp, crossEntropy_temp))
+
     # Optimize the threshold
     # For each fold record corresponding auc and auc-weighted accuracy
     y_pred_ensemble=0
@@ -80,7 +90,7 @@ def xgb_crossval(p):
     multi=torch.ones(1, requires_grad=True)
     optimizer=torch.optim.Adam([T]+[multi], lr=1e-1, weight_decay=5e-6)
     labels=torch.tensor(test_y).float()
-    for t in range(200):
+    for t in range(5*1000):
         optimizer.zero_grad()
         score=torch.sigmoid(multi*(y_pred_ensemble-T))
         loss=-torch.mean(labels*torch.log(score)+(1-labels)*torch.log(1-score))
@@ -112,27 +122,29 @@ def run_crossval_xgb(feature, gt_train):
     hp_config.append(feature)
     hp_config.append(gt_train)
 
-    # hp_config.append(hp.qloguniform('max_depth', low=math.log(2), high=math.log(15), q=1))
-    hp_config.append(hp.qloguniform('max_depth', low=1, high=4, q=1))
+    hp_config.append(hp.qloguniform('max_depth', low=math.log(2), high=math.log(15), q=1))
+    # hp_config.append(hp.qloguniform('max_depth', low=1, high=4, q=1))
 
     # hp_config.append(hp.uniform('eta', low=0.5, high=1))
-    hp_config.append(hp.uniform('eta', low=0.1, high=0.9))
+    # hp_config.append(hp.uniform('eta', low=0.1, high=0.9))
+    hp_config.append(hp.uniform('eta', low=0.005, high=0.1))
+    # hp_config.append(hp.uniform('eta', low=0.005, high=0.005))
 
     # hp_config.append(hp.loguniform('gamma', low=math.log(0.1), high=math.log(2)))
-    hp_config.append(hp.loguniform('gamma', low=0, high=3))
+    hp_config.append(hp.loguniform('gamma', low=1, high=3))
 
     # hp_config.append(hp.loguniform('lamb', low=math.log(0.1), high=math.log(1)))
-    hp_config.append(hp.loguniform('lamb', low=0, high=3))
+    hp_config.append(hp.loguniform('lamb', low=1, high=3))
 
     # hp_config.append(hp.loguniform('alpha', low=math.log(0.1), high=math.log(1)))
-    hp_config.append(hp.loguniform('alpha', low=0, high=3))
+    hp_config.append(hp.loguniform('alpha', low=0.2, high=3))
 
     ####### added #######
     # hp_config.append(hp.loguniform('alpha', low=0, high=3))
 
     # Optimize object with hypoeropt
     # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=100, trials=trials)
-    _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=50, trials=trials)
+    _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=20, trials=trials)
     best_model=getBestModelfromTrials(trials)
 
     return best_model

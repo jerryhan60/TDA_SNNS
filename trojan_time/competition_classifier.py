@@ -10,6 +10,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 import time
 from typing import List, Dict, Any
+from pdb import set_trace as bp
+
+
 
 
 import sys
@@ -109,42 +112,47 @@ def train_xgboost(models: List[ModelData]):
     logging.info("beginning xgboost training")
     best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
 
-    # testing!
-    feature = feature_test
-    labels = np.array(gt_test)
-    dtest = xgb.DMatrix(np.array(feature), label=labels)
-    y_pred = 0
-    for i in range(len(best_model_list['models'])):
-        best_bst=best_model_list['models'][i]
-        weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
-        y_pred += best_bst.predict(dtest)*weight
 
-    y_pred = y_pred / len(best_model_list)
-    T, b=best_model_list['threshold']
-    y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
-    acc_test = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
-    auc_test = roc_auc_score(labels, y_pred)
-    ce_test = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
+    # loop through a grid search of thresholds T and b
+    for T in np.linspace(0.1, 0.9, 9):
+        for b in np.linspace(0.1, 1, 10):
 
-    # also test on the training set
-    feature = feature_train
-    labels = np.array(gt_train)
-    dtest = xgb.DMatrix(np.array(feature), label=labels)
-    y_pred = 0
-    for i in range(len(best_model_list['models'])):
-        best_bst=best_model_list['models'][i]
-        weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
-        y_pred += best_bst.predict(dtest)*weight
+            # testing!
+            feature = feature_test
+            labels = np.array(gt_test)
+            dtest = xgb.DMatrix(np.array(feature), label=labels)
+            y_pred = 0
+            for i in range(len(best_model_list['models'])):
+                best_bst=best_model_list['models'][i]
+                weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
+                y_pred += best_bst.predict(dtest)*weight
 
-    y_pred = y_pred / len(best_model_list)
-    T, b=best_model_list['threshold']
-    y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
-    acc_train = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
-    auc_train = roc_auc_score(labels, y_pred)
-    ce_train = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
+            y_pred = y_pred / len(best_model_list)
+            # T, b=best_model_list['threshold']
+            y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
+            acc_test = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
+            auc_test = roc_auc_score(labels, y_pred)
+            ce_test = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
 
-    logging.info(f"train acc: {acc_train:.4f}, train auc: {auc_train:.4f}, train ce: {ce_train:.4f}")
-    logging.info(f"test acc: {acc_test:.4f}, test auc: {auc_test:.4f}, test ce: {ce_test:.4f}")
+            # also test on the training set
+            feature = feature_train
+            labels = np.array(gt_train)
+            dtest = xgb.DMatrix(np.array(feature), label=labels)
+            y_pred = 0
+            for i in range(len(best_model_list['models'])):
+                best_bst=best_model_list['models'][i]
+                weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
+                y_pred += best_bst.predict(dtest)*weight
+
+            y_pred = y_pred / len(best_model_list)
+            # T, b=best_model_list['threshold']
+            y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
+            acc_train = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
+            auc_train = roc_auc_score(labels, y_pred)
+            ce_train = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
+
+            logging.info(f"train acc: {acc_train:.4f}, train auc: {auc_train:.4f}, train ce: {ce_train:.4f}")
+            logging.info(f"test acc: {acc_test:.4f}, test auc: {auc_test:.4f}, test ce: {ce_test:.4f}")
 
 
 if __name__ == "__main__":
@@ -157,11 +165,13 @@ if __name__ == "__main__":
     cache_dir = join(root, "calculated_features_cache")
 
     models = load_all_models(models_dir, cache_dir)
-    print(models[0])
+    # models = models[:300]
 
     # filter for only resnets
     models = [x for x in models if x.architecture == "resnet50"]
-    #models = [x for x in models if x.architecture != "resnet50"]
+    # models = [x for x in models if x.architecture != "resnet50"]
+    print(models[0])
+    # models = models[:50]
 
     triggered = [x for x in models if x.label == 1]
     clean = [x for x in models if x.label == 0]
