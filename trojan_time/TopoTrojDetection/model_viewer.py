@@ -204,4 +204,7 @@ psf_config['device'] = device
 print("Extracting topological features...")
 fv = modified_topo_psf_feature_extract(model, None, psf_config)
 print("Topological features extracted.")
-print(fv['persistent_diagram'])
+print("psf_feature_pos.shape: ", fv['psf_feature_pos'].shape)
+print("topo_feature_pos.shape: ", fv['topo_feature_pos'].shape)
+print("correlation_matrix.shape: ", fv['correlation_matrix'].shape)
+# print(fv['persistent_diagram'])
