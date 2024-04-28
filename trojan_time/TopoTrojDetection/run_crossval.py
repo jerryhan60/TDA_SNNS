@@ -26,12 +26,15 @@ def xgb_crossval(p):
 
     import xgboost as xgb # Need to import here for HPO
     feature, gt_labels, max_depth, eta, gamma, lamb, alpha=p
-    param = {'objective': 'binary:logistic', 'nthread':4, 'eval_metric':'auc'}
+    param = {'objective': 'binary:logistic', 'nthread': 20, 'eval_metric':'auc'}
     param['max_depth']=int(max_depth)
     param['eta']=eta
     param['gamma']=gamma
     param['lambda']=lamb
     param['alpha']=alpha
+
+    ################ added ################
+    param['subsample']=0.8
 
     acc = []
     auc = []
@@ -51,7 +54,7 @@ def xgb_crossval(p):
         dtest = xgb.DMatrix(test_set, label=test_y)
         evallist = [(dtest, 'eval'), (dtrain, 'train')]
 
-        bst = xgb.train(param, dtrain, num_epochs, evallist, verbose_eval=False)
+        bst = xgb.train(param, dtrain, num_epochs, evals=evallist, verbose_eval=False)
         y_pred = bst.predict(dtest)
         soft_pred = y_pred
         # Record accuracy and cross entropy
@@ -108,13 +111,28 @@ def run_crossval_xgb(feature, gt_train):
     hp_config=[]
     hp_config.append(feature)
     hp_config.append(gt_train)
-    hp_config.append(hp.qloguniform('max_depth', low=math.log(2), high=math.log(15), q=1))
-    hp_config.append(hp.uniform('eta', low=0.5, high=1))
-    hp_config.append(hp.loguniform('gamma', low=math.log(0.1), high=math.log(2)))
-    hp_config.append(hp.loguniform('lamb', low=math.log(0.1), high=math.log(1)))
-    hp_config.append(hp.loguniform('alpha', low=math.log(0.1), high=math.log(1)))
+
+    # hp_config.append(hp.qloguniform('max_depth', low=math.log(2), high=math.log(15), q=1))
+    hp_config.append(hp.qloguniform('max_depth', low=1, high=4, q=1))
+
+    # hp_config.append(hp.uniform('eta', low=0.5, high=1))
+    hp_config.append(hp.uniform('eta', low=0.1, high=0.9))
+
+    # hp_config.append(hp.loguniform('gamma', low=math.log(0.1), high=math.log(2)))
+    hp_config.append(hp.loguniform('gamma', low=0, high=3))
+
+    # hp_config.append(hp.loguniform('lamb', low=math.log(0.1), high=math.log(1)))
+    hp_config.append(hp.loguniform('lamb', low=0, high=3))
+
+    # hp_config.append(hp.loguniform('alpha', low=math.log(0.1), high=math.log(1)))
+    hp_config.append(hp.loguniform('alpha', low=0, high=3))
+
+    ####### added #######
+    # hp_config.append(hp.loguniform('alpha', low=0, high=3))
+
     # Optimize object with hypoeropt
-    _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=100, trials=trials)
+    # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=100, trials=trials)
+    _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=50, trials=trials)
     best_model=getBestModelfromTrials(trials)
 
     return best_model
@@ -262,18 +280,34 @@ def run_crossval_mlp(feature, gt_train):
     hp_config=[]
     hp_config.append(feature)
     hp_config.append(gt_train)
-    hp_config.append(hp.quniform('nlayers_encoder_psf', low=2, high=5, q=1))
-    hp_config.append(hp.qloguniform('nh_encoder_psf', low=math.log(128), high=math.log(256), q=1))
-    hp_config.append(hp.quniform('nlayers_encoder_topo', low=2, high=5, q=1))
-    hp_config.append(hp.qloguniform('nh_encoder_topo', low=math.log(128), high=math.log(256), q=1))
-    hp_config.append(hp.quniform('nlayers_cls', low=2, high=5, q=1))
+# TODO FIXME
+    raise NotImplementedError
+    # i uh messed this up, need to revert this to the original code from the repo srry :grimacing:
+
+"""
+    hp_config.append(hp.quniform('nlayers_encoder_psf', low=2, high=3, q=1)) # max depth
+
+    hp_config.append(hp.qloguniform('nh_encoder_psf', low=math.log(128), high=math.log(256), q=1)) # eta
+    # hp_config.append(hp.qloguniform('nh_encoder_psf', low=math.log(0.1), high=math.log(0.9), q=1)) # eta
+
+    hp_config.append(hp.quniform('nlayers_encoder_topo', low=2, high=5, q=1)) # gamma
+    # hp_config.append(hp.quniform('nlayers_encoder_topo', low=0, high=5, q=1)) # gamma
+
+    hp_config.append(hp.qloguniform('nh_encoder_topo', low=math.log(128), high=math.log(256), q=1)) # lambda
+    # hp_config.append(hp.qloguniform('nh_encoder_topo', low=0, high=5, q=1)) # lambda
+
+    hp_config.append(hp.quniform('nlayers_cls', low=0, high=5, q=1)) # alpha
+
     hp_config.append(hp.qloguniform('nh_cls', low=math.log(45), high=math.log(128), q=1))
     hp_config.append(hp.loguniform('lr', low=math.log(1e-3), high=math.log(0.2)))
     hp_config.append(hp.loguniform('weight_decay', low=math.log(5e-5), high=math.log(5e-3)))
-    _=fmin(mlp_crossval, hp_config, algo=tpe.suggest, max_evals=50, trials=trials)
+
+    _ = fmin(mlp_crossval, hp_config, algo=tpe.suggest, max_evals=50, trials=trials)
+
     best_model_list=getBestModelfromTrials(trials)
 
     return best_model_list
+"""
 
 def getBestModelfromTrials(trials):
     """
