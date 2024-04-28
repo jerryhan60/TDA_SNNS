@@ -64,6 +64,23 @@ def process_model(args):
         gt_file = None
         USE_EXAMPLE = True
 
+        save_file_dir = os.path.join(
+                os.path.dirname(root),
+                "calculated_features_cache",
+                model_name
+                )
+
+        save_file_path = os.path.join(
+                save_file_dir,
+                "fv.pkl",
+                )
+        if os.path.exists(save_file_dir) and len(os.listdir(save_file_dir)) > 0:
+            logging.info("Skipping model {} as it has been processed".format(model_name))
+            return
+
+        if not os.path.exists(save_file_dir):
+            os.makedirs(save_file_dir)
+
 
         """for root_m, dirnames, filenames in os.walk(os.path.join(root, model_name)):
             for filename in filenames:
@@ -163,19 +180,6 @@ def process_model(args):
         # model_file_path_prefix = '/'.join(model_file_path.split('/')[:-1])
         # save_file_path = os.path.join(model_file_path_prefix, 'test_extracted_psf_topo_feature.pkl')
 
-        save_file_dir = os.path.join(
-                os.path.dirname(root),
-                "calculated_features_cache",
-                model_name
-                )
-
-        save_file_path = os.path.join(
-                save_file_dir,
-                "fv.pkl",
-                )
-
-        if not os.path.exists(save_file_dir):
-            os.makedirs(save_file_dir)
 
         fv = topo_psf_feature_extract(model, img_c, psf_config, cache_dir=save_file_dir)
         with open(save_file_path, 'wb') as f:

@@ -204,6 +204,7 @@ def topo_psf_feature_extract(
 
     PH_list=[]
     PD_list=[]
+    sparse_PD_list=[]
     rips = Rips(verbose=False)
     model=model.to(device)
     progress=0
@@ -286,6 +287,7 @@ def topo_psf_feature_extract(
                 else:
                     lambdas=getGreedyPerm(D)
                     D = getApproxSparseDM(lambdas, 0.1, D)
+                    # sparse_PD_list.append(D)
                     PH=rips.fit_transform(D, distance_matrix=True)
 
                 PH[0]=np.array(PH[0])
@@ -312,9 +314,9 @@ def topo_psf_feature_extract(
         with open(f"{cache_dir}/PH_list.pkl", "wb") as f:
             pickle.dump(PH_list, f)
         f.close()
-        with open(f"{cache_dir}/PD_list.pkl", "wb") as f:
-            pickle.dump(PD_list, f)
-        f.close()
+        # with open(f"{cache_dir}/PD_list.pkl", "wb") as f:
+        #     pickle.dump(PD_list, f)
+        # f.close()
 
 
     fv={}
