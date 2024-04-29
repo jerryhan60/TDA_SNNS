@@ -8,6 +8,7 @@ import torch
 import random
 import logging
 logging.basicConfig(level=logging.INFO)
+logging.getLogger('hyperopt').setLevel(logging.WARNING)
 import time
 from typing import List, Dict, Any
 from pdb import set_trace as bp
@@ -32,11 +33,14 @@ def seed_everything(seed = 42):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
-def load_all_models(models_dir, cache_dir):
+def load_all_models(models_dir, cache_dir, percentage=1.0):
     start = time.time()
     seed_everything()
 
-    model_paths = sorted([x for x in os.listdir(cache_dir) if x.startswith('id')])
+    # model_paths = sorted([x for x in os.listdir(cache_dir) if x.startswith('id')])
+    model_paths = [x for x in os.listdir(cache_dir) if x.startswith('id')]
+    random.shuffle(model_paths)
+    model_paths = sorted(model_paths[:int(len(model_paths) * percentage)])
 
     # filter out all the models with empty cache dirs
     model_paths = [x for x in model_paths if len(os.listdir(join(cache_dir, x))) != 0]
@@ -59,6 +63,68 @@ def load_all_models(models_dir, cache_dir):
 
     logging.info(f"loaded {len(models)} models in {time.time() - start:.2f} seconds")
     return models
+
+def run_model_tests(feature, labels, model_list, thresholds = None, calc_thresholds=False):
+
+
+    feature = feature
+    labels = np.array(labels)
+    dtest = xgb.DMatrix(np.array(feature), label=labels)
+
+    y_pred = 0
+    for i in range(len(model_list['models'])):
+        best_bst=model_list['models'][i]
+        weight=model_list['weight'][i]/sum(model_list['weight'])
+        y_pred += best_bst.predict(dtest)*weight
+
+    # T, b=model_list['threshold']
+    # T, b = 0.1, 0.01
+
+    auc = roc_auc_score(labels, y_pred)
+    y_pred = y_pred / len(model_list)
+
+    if not calc_thresholds and thresholds is not None:
+        T, b = thresholds
+
+        y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
+        acc = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
+        # ce_test = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
+        ce = (np.mean(-(labels * np.log(y_pred + 1e-10) + (1 - labels) * np.log(1 - y_pred + 1e-10))))
+
+        return {
+                "acc": acc,
+                "auc": auc,
+                "ce": ce,
+                "thresholds": (T, b)
+                }
+
+    logging.info("calculating thresholds throuh grid search")
+    accs = []
+    ces = []
+    thresholds = []
+
+    # frick it let's just do this manually
+    # do a grid search for the best T and b
+    for T in np.linspace(0.0, 0.2, 100): # todo switch to a *correct* optimization method?
+        for b in np.linspace(0.0001, 0.3, 100):
+
+            test_y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
+            acc = np.sum((test_y_pred >= 0.5)==labels)/len(test_y_pred)
+            # ce_test = np.sum(-(labels * np.log(test_y_pred) + (1 - labels) * np.log(1 - test_y_pred))) / len(test_y_pred)
+            ce = (np.mean(-(labels * np.log(test_y_pred + 1e-10) + (1 - labels) * np.log(1 - test_y_pred + 1e-10))))
+
+            accs.append(acc)
+            ces.append(ce)
+            thresholds.append((T, b))
+
+    best_ind = np.argmax(accs)
+
+    return {
+            "acc": accs[best_ind],
+            "auc": auc,
+            "ce": ces[best_ind],
+            "thresholds": thresholds[best_ind]
+            }
 
 def train_xgboost(models: List[ModelData]):
     CLASSES = 5 # FIXME don't hardcode this
@@ -112,10 +178,12 @@ def train_xgboost(models: List[ModelData]):
     logging.info("beginning xgboost training")
     best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
 
-
+    """
     # loop through a grid search of thresholds T and b
-    for T in np.linspace(0.1, 0.9, 9):
-        for b in np.linspace(0.1, 1, 10):
+    train_results = []
+    test_results = []
+    for T in np.linspace(0.01, 0.9, 20):
+        for b in np.linspace(0.000001, 0.3, 20):
 
             # testing!
             feature = feature_test
@@ -151,8 +219,27 @@ def train_xgboost(models: List[ModelData]):
             auc_train = roc_auc_score(labels, y_pred)
             ce_train = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
 
-            logging.info(f"train acc: {acc_train:.4f}, train auc: {auc_train:.4f}, train ce: {ce_train:.4f}")
-            logging.info(f"test acc: {acc_test:.4f}, test auc: {auc_test:.4f}, test ce: {ce_test:.4f}")
+            # logging.info(f"train acc: {acc_train:.4f}, train auc: {auc_train:.4f}, train ce: {ce_train:.4f}")
+            # logging.info(f"test acc: {acc_test:.4f}, test auc: {auc_test:.4f}, test ce: {ce_test:.4f}")
+
+            train_results.append((T, b, acc_train, auc_train, ce_train))
+            test_results.append((T, b, acc_test, auc_test, ce_test))
+
+    test_results = sorted(test_results, key=lambda x: x[2], reverse=True)
+    train_results = sorted(train_results, key=lambda x: x[2], reverse=True)
+
+    print(test_results, "\n\n")
+    print(train_results)
+    """
+
+    train_results = run_model_tests(feature_train, gt_train, best_model_list, calc_thresholds=True)
+    test_results = run_model_tests(feature_test, gt_test, best_model_list, thresholds=train_results['thresholds'])
+
+    # manual_restuls = run_model_tests(feature_train, gt_train, best_model_list, thresholds=[0.1, 0.0195])
+
+    print("train", train_results)
+    print("test", test_results)
+    # print("manual_restuls", manual_restuls)
 
 
 if __name__ == "__main__":
@@ -164,8 +251,9 @@ if __name__ == "__main__":
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
-    models = load_all_models(models_dir, cache_dir)
-    # models = models[:300]
+    models = load_all_models(models_dir, cache_dir
+                             # , percentage=0.2
+                             )
 
     # filter for only resnets
     models = [x for x in models if x.architecture == "resnet50"]
@@ -189,6 +277,7 @@ if __name__ == "__main__":
     np.random.shuffle(models)
 
     print(len(models))
+
 
     train_xgboost(models)
 
