@@ -197,61 +197,9 @@ def train_xgboost(models: List[ModelData]):
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
     log.info("beginning xgboost training")
+
     best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
 
-    """
-    # loop through a grid search of thresholds T and b
-    train_results = []
-    test_results = []
-    for T in np.linspace(0.01, 0.9, 20):
-        for b in np.linspace(0.000001, 0.3, 20):
-
-            # testing!
-            feature = feature_test
-            labels = np.array(gt_test)
-            dtest = xgb.DMatrix(np.array(feature), label=labels)
-            y_pred = 0
-            for i in range(len(best_model_list['models'])):
-                best_bst=best_model_list['models'][i]
-                weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
-                y_pred += best_bst.predict(dtest)*weight
-
-            y_pred = y_pred / len(best_model_list)
-            # T, b=best_model_list['threshold']
-            y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
-            acc_test = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
-            auc_test = roc_auc_score(labels, y_pred)
-            ce_test = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
-
-            # also test on the training set
-            feature = feature_train
-            labels = np.array(gt_train)
-            dtest = xgb.DMatrix(np.array(feature), label=labels)
-            y_pred = 0
-            for i in range(len(best_model_list['models'])):
-                best_bst=best_model_list['models'][i]
-                weight=best_model_list['weight'][i]/sum(best_model_list['weight'])
-                y_pred += best_bst.predict(dtest)*weight
-
-            y_pred = y_pred / len(best_model_list)
-            # T, b=best_model_list['threshold']
-            y_pred=torch.sigmoid(b*(torch.tensor(y_pred)-T)).numpy()
-            acc_train = np.sum((y_pred >= 0.5)==labels)/len(y_pred)
-            auc_train = roc_auc_score(labels, y_pred)
-            ce_train = np.sum(-(labels * np.log(y_pred) + (1 - labels) * np.log(1 - y_pred))) / len(y_pred)
-
-            # logging.info(f"train acc: {acc_train:.4f}, train auc: {auc_train:.4f}, train ce: {ce_train:.4f}")
-            # logging.info(f"test acc: {acc_test:.4f}, test auc: {auc_test:.4f}, test ce: {ce_test:.4f}")
-
-            train_results.append((T, b, acc_train, auc_train, ce_train))
-            test_results.append((T, b, acc_test, auc_test, ce_test))
-
-    test_results = sorted(test_results, key=lambda x: x[2], reverse=True)
-    train_results = sorted(train_results, key=lambda x: x[2], reverse=True)
-
-    print(test_results, "\n\n")
-    print(train_results)
-    """
 
     train_results = run_model_tests(feature_train, gt_train, best_model_list, calc_thresholds=True)
     test_results = run_model_tests(feature_test, gt_test, best_model_list, thresholds=train_results['thresholds'])
@@ -262,13 +210,16 @@ def train_xgboost(models: List[ModelData]):
     print("test", test_results)
     # print("manual_restuls", manual_restuls)
 
-
 if __name__ == "__main__":
 
+
     device = torch.device('mps')
+    # device = torch.device('mps')
+    # device = torch.device('cpu')
 
     # TODO update this to ur device
-    root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    # root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    root = "/home/dataset_storage/TopoTrojDetect/competition_dataset"
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
