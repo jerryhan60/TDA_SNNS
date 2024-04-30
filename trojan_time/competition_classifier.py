@@ -7,13 +7,12 @@ from rich.progress import track
 import torch
 import random
 import logging
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('hyperopt').setLevel(logging.WARNING)
+# logging.basicConfig(level=logging.INFO)
+# logging.getLogger('hyperopt').setLevel(logging.WARNING)
+from colorlog import ColoredFormatter
 import time
 from typing import List, Dict, Any
 from pdb import set_trace as bp
-
-
 
 
 import sys
@@ -32,6 +31,24 @@ def seed_everything(seed = 42):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
+
+log = logging.getLogger('pythonConfig')
+def setup_logger():
+    global log
+    LOGFORMAT = "  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger('hyperopt').setLevel(logging.WARNING)
+
+    formatter = ColoredFormatter(LOGFORMAT)
+    stream = logging.StreamHandler()
+    stream.setLevel(logging.INFO)
+    stream.setFormatter(formatter)
+    log = logging.getLogger('pythonConfig')
+    log.setLevel(logging.INFO)
+    log.addHandler(stream)
+
+setup_logger()
+
 
 def load_all_models(models_dir, cache_dir, percentage=1.0):
     start = time.time()
@@ -61,7 +78,7 @@ def load_all_models(models_dir, cache_dir, percentage=1.0):
 
         models.append(model)
 
-    logging.info(f"loaded {len(models)} models in {time.time() - start:.2f} seconds")
+    log.info(f"loaded {len(models)} models in {time.time() - start:.2f} seconds")
     return models
 
 def run_model_tests(feature, labels, model_list, thresholds = None, calc_thresholds=False):
@@ -98,7 +115,7 @@ def run_model_tests(feature, labels, model_list, thresholds = None, calc_thresho
                 "thresholds": (T, b)
                 }
 
-    logging.info("calculating thresholds throuh grid search")
+    log.info("calculating thresholds throuh grid search")
     accs = []
     ces = []
     thresholds = []
@@ -162,7 +179,11 @@ def train_xgboost(models: List[ModelData]):
     psf_topk_max=psf_feature_dat.topk(k=min(3, n_classes), dim=3)[0].mean(2).max(2)[0].view(len(gt_list), -1)
     psf_feature_dat=torch.cat([psf_diff_max, psf_med_max, psf_std_max, psf_topk_max], dim=1)
 
-    dat = topo_feature.view(topo_feature.shape[0], -1)
+    # dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
+    # dat = topo_feature.view(topo_feature.shape[0], -1)
+
+    dat = psf_feature_dat
+
     dat=preprocessing.scale(dat)
     gt_list=torch.tensor(gt_list)
 
@@ -175,7 +196,7 @@ def train_xgboost(models: List[ModelData]):
     feature_train, feature_test = dat[train_ind], dat[test_ind]
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
-    logging.info("beginning xgboost training")
+    log.info("beginning xgboost training")
     best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
 
     """
