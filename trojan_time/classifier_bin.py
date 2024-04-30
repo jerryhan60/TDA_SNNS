@@ -12,22 +12,22 @@ from typing import List, Dict, Any
 import logging
 from colorlog import ColoredFormatter
 
-log = logging.getLogger('pythonConfig')
-def setup_logger():
-    global log
-    LOGFORMAT = "  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
-    logging.basicConfig(level=logging.INFO)
-    logging.getLogger('hyperopt').setLevel(logging.WARNING)
+# log = logging.getLogger('pythonConfig')
+# def setup_logger():
+#     global log
+#     LOGFORMAT = "  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
+#     logging.basicConfig(level=logging.INFO)
+#     logging.getLogger('hyperopt').setLevel(logging.WARNING)
 
-    formatter = ColoredFormatter(LOGFORMAT)
-    stream = logging.StreamHandler()
-    stream.setLevel(logging.INFO)
-    stream.setFormatter(formatter)
-    log = logging.getLogger('pythonConfig')
-    log.setLevel(logging.INFO)
-    log.addHandler(stream)
+#     formatter = ColoredFormatter(LOGFORMAT)
+#     stream = logging.StreamHandler()
+#     stream.setLevel(logging.INFO)
+#     stream.setFormatter(formatter)
+#     log = logging.getLogger('pythonConfig')
+#     log.setLevel(logging.INFO)
+#     log.addHandler(stream)
 
-setup_logger()
+# setup_logger()
 
 
 class xgb_classifier:
@@ -93,10 +93,10 @@ class xgb_classifier:
         import xgboost as xgb # Need to import here for HPO
 
         if self.classifier_params['device'] != "cuda":
-            log.warning("you are not currently using GPU accel!")
+            logging.warning("you are not currently using GPU accel!")
 
         if self.general_params is None:
-            log.error("general_params not set!")
+            logging.error("general_params not set!")
             return None
 
 
@@ -120,7 +120,7 @@ class xgb_classifier:
 
     def test(self):
         if self.model is None:
-            log.error("model not trained! run model.train first")
+            logging.error("model not trained! run model.train first")
             return None
 
 
@@ -149,7 +149,7 @@ class xgb_classifier:
                         "thresholds": (T, b)
                         }
 
-            # log.info("calculating thresholds through grid search")
+            logging.info("calculating thresholds throuh grid search")
             accs = []
             ces = []
             thresholds = []
