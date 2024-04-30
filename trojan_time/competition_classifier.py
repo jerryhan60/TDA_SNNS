@@ -166,7 +166,11 @@ def featurize(models: List[ModelData]):
     psf_topk_max=psf_feature_dat.topk(k=min(3, n_classes), dim=3)[0].mean(2).max(2)[0].view(len(gt_list), -1)
     psf_feature_dat=torch.cat([psf_diff_max, psf_med_max, psf_std_max, psf_topk_max], dim=1)
 
-    dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
+    # dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
+
+    dat=psf_feature_dat
+    # dat = topo_feature.view(topo_feature.shape[0], -1)
+
     dat=preprocessing.scale(dat)
     gt_list=torch.tensor(gt_list)
 
@@ -174,37 +178,6 @@ def featurize(models: List[ModelData]):
         "features": np.array(dat),
         "labels": np.array(gt_list)
     }
-
-
-"""
-def train_xgboost(models: List[ModelData]):
-    TRAIN_TEST_SPLIT = 0.8
-    _x = featurize(models)
-    dat = _x['features']
-    gt_list = _x['labels']
-
-    N = len(gt_list)
-    n_train = int(TRAIN_TEST_SPLIT * N)
-    ind_reshuffle = np.random.choice(list(range(N)), N, replace=False)
-    train_ind = ind_reshuffle[:n_train]
-    test_ind = ind_reshuffle[n_train:]
-
-    feature_train, feature_test = dat[train_ind], dat[test_ind]
-    gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
-
-    log.info("beginning xgboost training")
-    best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
-
-
-    train_results = run_model_tests(feature_train, gt_train, best_model_list, calc_thresholds=True)
-    test_results = run_model_tests(feature_test, gt_test, best_model_list, thresholds=train_results['thresholds'])
-
-    # manual_restuls = run_model_tests(feature_train, gt_train, best_model_list, thresholds=[0.1, 0.0195])
-
-    print("train", train_results)
-    print("test", test_results)
-    # print("manual_restuls", manual_restuls)
-"""
 
 
 if __name__ == "__main__":
@@ -259,11 +232,11 @@ if __name__ == "__main__":
     feature_train, feature_test = dat[train_ind], dat[test_ind]
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
-    for gamma in [0, 1, 10, 20]:
+    for gamma in [0, 1]:
 
         general_params = {
             "num_epochs": 30*4,
-            "test_percentage": 0.1
+            "test_percentage": 0.2
         }
 
         classifier_params = {
@@ -272,13 +245,13 @@ if __name__ == "__main__":
             'eval_metric':'error',
             'device': "cuda",
 
-            'max_depth': 6,
+            'max_depth': 5,
             'eta': 0.05,
             'gamma': gamma,
             'lambda': 0,
             'alpha': 0,
 
-            'subsample': 0.7,
+            'subsample': 0.5,
         }
 
         model = xgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
@@ -293,4 +266,3 @@ if __name__ == "__main__":
         print("Train results", train_results)
         print("Test results", test_results)
 
-    # train_xgboost(models)
