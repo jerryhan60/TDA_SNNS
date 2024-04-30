@@ -13,10 +13,27 @@ import torch
 import torch.nn.functional as F
 from hyperopt import hp, tpe, fmin, STATUS_OK, Trials
 import logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+from colorlog import ColoredFormatter
 
 from networks import ResNet18, DenseNet121, MLP
 
+log = logging.getLogger('pythonConfig')
+def setup_logger():
+    global log
+    LOGFORMAT = "  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s"
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger('hyperopt').setLevel(logging.WARNING)
+
+    formatter = ColoredFormatter(LOGFORMAT)
+    stream = logging.StreamHandler()
+    stream.setLevel(logging.INFO)
+    stream.setFormatter(formatter)
+    log = logging.getLogger('pythonConfig')
+    log.setLevel(logging.INFO)
+    log.addHandler(stream)
+
+setup_logger()
 
 def xgb_crossval(p):
     """
@@ -41,11 +58,11 @@ def xgb_crossval(p):
     param['alpha']=alpha
 
     ################ added ################
-    param['subsample']=0.6
+    param['subsample']=0.7
     #param['colsample_bytree']=0.8
 
     #param['tree_method']='gpu_hist' :(
-    logging.warning("you are not currently using GPU accel!")
+    log.warning("you are not currently using GPU accel!")
 
     acc = []
     auc = []
@@ -56,7 +73,7 @@ def xgb_crossval(p):
     xgb_list=[]
     fold = 4
     # num_epochs=30*10
-    num_epochs=30*4
+    num_epochs=30*5
     fold_ind=0
 
     y_pred_aggregated = []
@@ -168,15 +185,15 @@ def run_crossval_xgb(feature, gt_train):
     hp_config.append(gt_train)
 
     # hp_config.append(hp.qloguniform('max_depth', low=math.log(2), high=math.log(15), q=1))
-    hp_config.append(hp.qloguniform('max_depth', low=0.9, high=5, q=1))
+    hp_config.append(hp.qloguniform('max_depth', low=0.9, high=8, q=1))
 
     # hp_config.append(hp.uniform('eta', low=0.5, high=1))
     # hp_config.append(hp.uniform('eta', low=0.1, high=0.9))
     # hp_config.append(hp.uniform('eta', low=0.005, high=0.05))
-    hp_config.append(hp.uniform('eta', low=0.005, high=0.1))
+    hp_config.append(hp.uniform('eta', low=0.002, high=0.03))
 
     # hp_config.append(hp.loguniform('gamma', low=math.log(0.1), high=math.log(2)))
-    hp_config.append(hp.loguniform('gamma', low=0, high=2))
+    hp_config.append(hp.loguniform('gamma', low=0.2, high=3))
 
     # hp_config.append(hp.loguniform('lamb', low=math.log(0.1), high=math.log(1)))
     hp_config.append(hp.loguniform('lamb', low=0, high=0.3))
@@ -191,11 +208,12 @@ def run_crossval_xgb(feature, gt_train):
     # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, ax_evals=100, trials=trials)
 
     # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=100, trials=trials)
-    # max_evals = 500
-    max_evals = 20
+   max_evals = 20
 
     if max_evals < 100:
-        logging.warning(f"max evals is {max_evals}, not running at full fidelity!")
+        log.warning(f"max evals is {max_evals}, not running at full fidelity!")
+    if max_evals >= 100:
+        log.warning(f"max evals is {max_evals}, running at full fidelity! you can reduce this when prototyping for much faster speeds")
 
     _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=max_evals, trials=trials)
 
