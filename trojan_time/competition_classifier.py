@@ -232,10 +232,10 @@ if __name__ == "__main__":
     feature_train, feature_test = dat[train_ind], dat[test_ind]
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
-    for gamma in [0, 1]:
+    for gamma in [1]:
 
         general_params = {
-            "num_epochs": 30*4,
+            "num_epochs": 30*60,
             "test_percentage": 0.2
         }
 
@@ -245,11 +245,11 @@ if __name__ == "__main__":
             'eval_metric':'error',
             'device': "cuda",
 
-            'max_depth': 5,
-            'eta': 0.05,
+            'max_depth': 3,
+            'eta': 0.008,
             'gamma': gamma,
-            'lambda': 0,
-            'alpha': 0,
+            'lambda': 2,
+            'alpha': 0.2,
 
             'subsample': 0.5,
         }
