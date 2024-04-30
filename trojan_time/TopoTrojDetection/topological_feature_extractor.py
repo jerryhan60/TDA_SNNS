@@ -14,6 +14,10 @@ from ripser import Rips
 from scipy import sparse
 from scipy.sparse.csr import csr_matrix
 import time
+import pickle
+
+import logging
+logging.basicConfig(level=logging.INFO)
 
 from topo_utils import mat_bc_adjacency, parse_arch, feature_collect, sample_act, mat_discorr_adjacency, mat_cos_adjacency, mat_jsdiv_adjacency, mat_pearson_adjacency
 
@@ -138,7 +142,12 @@ def calc_topo_feature(PH: List, dim: int)-> Dict:
     return topo_feature_dict
 
 
-def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_config: Dict)-> Dict:
+def topo_psf_feature_extract(
+        model: torch.nn.Module,
+        example_dict: Dict,
+        psf_config: Dict,
+        cache_dir: str = None
+        )-> Dict:
     """
     Extract topological features from a given torch model.
     Input args:
@@ -147,6 +156,9 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
     Return:
         fv (Dict). Dictionary contains extracted features
     """
+
+    logging.info("starting feature extraction..")
+
     step_size=psf_config['step_size']
     stim_level=psf_config['stim_level']
     patch_size=psf_config['patch_size']
@@ -158,10 +170,12 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
 
     # If true input examples are not given, use all blank images instead
     if not example_dict:
+        logging.warning("No input examples are given, using blank images instead!!")
         example_dict=defaultdict(list)
         example_dict[0].append(torch.zeros(input_shape).unsqueeze(0))
 
     model=model.to(device)
+
     test_input=example_dict[0][0].to(device)
     num_classes=int(model(test_input).shape[1])
 
@@ -190,6 +204,7 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
 
     PH_list=[]
     PD_list=[]
+    sparse_PD_list=[]
     rips = Rips(verbose=False)
     model=model.to(device)
     progress=0
@@ -244,6 +259,9 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
                 if len(neural_act)>1.5e3:
                     neural_act, sample_n_neurons_list=sample_act(neural_act, layer_list, sample_size=n_neuron_sample)
 
+                model_file = cache_dir.split('/')[-1]
+                logging.info(f"building neural correlation matrix for {model_file} {pos_w} {pos_h}..")
+
                 # Build neural correlation matrix
                 if method=='distcorr':
                     neural_pd=mat_discorr_adjacency(neural_act)
@@ -259,6 +277,7 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
                     neural_pd=mat_jsdiv_adjacency(neural_act)
                 else:
                     raise Exception(f"Correlation metrics {method} doesn't implemented !")
+
                 D=1-neural_pd.detach().cpu().numpy() if method!='bc' else -np.log(neural_pd.detach().cpu().numpy()+1e-6)
                 PD_list.append(neural_pd.detach().cpu().numpy())
 
@@ -268,6 +287,7 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
                 else:
                     lambdas=getGreedyPerm(D)
                     D = getApproxSparseDM(lambdas, 0.1, D)
+                    # sparse_PD_list.append(D)
                     PH=rips.fit_transform(D, distance_matrix=True)
 
                 PH[0]=np.array(PH[0])
@@ -275,6 +295,7 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
                 PH[0][np.where(PH[0]==np.inf)]=1
                 PH[1][np.where(PH[1]==np.inf)]=1
                 PH_list.append(PH)
+
                 # Compute the topological feature with the persistent diagram
                 clean_feature_0=calc_topo_feature(PH, 0)
                 clean_feature_1=calc_topo_feature(PH, 1)
@@ -289,8 +310,19 @@ def topo_psf_feature_extract(model: torch.nn.Module, example_dict: Dict, psf_con
 
             feature_w_pos+=1
 
+    if cache_dir:
+        with open(f"{cache_dir}/PH_list.pkl", "wb") as f:
+            pickle.dump(PH_list, f)
+        f.close()
+        # with open(f"{cache_dir}/PD_list.pkl", "wb") as f:
+        #     pickle.dump(PD_list, f)
+        # f.close()
+
+
     fv={}
     fv['psf_feature_pos']=psf_feature_pos
     fv['topo_feature_pos']=topo_feature_pos
     fv['correlation_matrix']=np.vstack([x[None, :, :] for x in PD_list]).mean(0)
     return fv
+
+

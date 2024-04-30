@@ -138,7 +138,8 @@ def generate_mnist_experiment(train, test, output, train_output_csv_file, test_o
 
     ############# Create the data ############
     # create the clean data
-    clean_dataset_rootdir = os.path.join(toplevel_folder, 'mnist_clean')
+    #clean_dataset_rootdir = os.path.join(toplevel_folder, 'mnist_clean')
+    clean_dataset_rootdir = "./data/new_mnist_clean"
     master_random_state_object.set_state(start_state)
     mnist.create_clean_dataset(train_csv_file, test_csv_file,
                                clean_dataset_rootdir, train_output_csv_file, test_output_csv_file,
@@ -161,13 +162,14 @@ def generate_mnist_experiment(train, test, output, train_output_csv_file, test_o
     trigger_frac = 0.0
     trigger_behavior = tdb.WrappedAdd(1, 10)
     e = tde.ClassicExperiment(toplevel_folder, trigger_behavior)
-    train_df = e.create_experiment(os.path.join(toplevel_folder, 'mnist_clean', 'train_mnist.csv'),
+    train_df = e.create_experiment("./data/new_mnist_clean/train_mnist.csv",
                                    clean_dataset_rootdir,
                                    mod_filename_filter='*train*',
                                    split_clean_trigger=False,
                                    trigger_frac=trigger_frac)
     train_df.to_csv(os.path.join(toplevel_folder, 'mnist_clean_experiment_train.csv'), index=None)
-    test_clean_df, test_triggered_df = e.create_experiment(os.path.join(toplevel_folder, 'mnist_clean','test_mnist.csv'),
+    #test_clean_df, test_triggered_df = e.create_experiment(os.path.join(toplevel_folder, 'mnist_clean','test_mnist.csv'),
+    test_clean_df, test_triggered_df = e.create_experiment("./data/new_mnist_clean/test_mnist.csv",
                                                            clean_dataset_rootdir,
                                                            mod_filename_filter='*test*',
                                                            split_clean_trigger=True,
@@ -182,13 +184,13 @@ def generate_mnist_experiment(train, test, output, train_output_csv_file, test_o
     # In the code below, we create an experiment with 10% poisoned data to allow for
     # experimentation.
     trigger_frac = troj_frac
-    train_df = e.create_experiment(os.path.join(toplevel_folder, 'mnist_clean', 'train_mnist.csv'),
+    train_df = e.create_experiment("./data/new_mnist_clean/train_mnist.csv",
                                    os.path.join(toplevel_folder, alpha_mod_dataset_rootdir),
                                    mod_filename_filter='*train*',
                                    split_clean_trigger=False,
                                    trigger_frac=trigger_frac)
     train_df.to_csv(os.path.join(toplevel_folder, 'mnist_lambdatrigger_' + str(trigger_frac) + '_experiment_train.csv'), index=None)
-    test_clean_df, test_triggered_df = e.create_experiment(os.path.join(toplevel_folder, 'mnist_clean', 'test_mnist.csv'),
+    test_clean_df, test_triggered_df = e.create_experiment("./data/new_mnist_clean/test_mnist.csv",
                                                            os.path.join(toplevel_folder, alpha_mod_dataset_rootdir),
                                                            mod_filename_filter='*test*',
                                                            split_clean_trigger=True,

@@ -49,10 +49,18 @@ if __name__=='__main__':
         a.experiment_path = os.path.abspath(os.path.join(model_folder))                         # Top level dir
         a.models_output = os.path.abspath(os.path.join(model_folder))                           # DIR to hold model's .pt file
         a.log = os.path.abspath(LOG_FILE)                                                       # Log file path
-        a.train = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'))   # Folder contains experiment training set
-        a.test = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/test.csv'))     # Folder contains experiment testing set
-        a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, model_name, 'mnist_clean/train_mnist.csv'))
-        a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  model_name, 'mnist_clean/test_mnist.csv'))
+        #a.train = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'))   # Folder contains experiment training set
+        #a.test = os.path.abspath(os.path.join(TOP_DIR, model_name, 'data/clean/test.csv'))     # Folder contains experiment testing set
+
+        a.train = os.path.abspath(os.path.join(TOP_DIR, 'new_data/clean/train.csv'))   # Folder contains experiment training set
+        a.test = os.path.abspath(os.path.join(TOP_DIR, 'new_data/clean/test.csv'))     # Folder contains experiment testing set
+
+        #a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, model_name, 'mnist_clean/train_mnist.csv'))
+        #a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  model_name, 'mnist_clean/test_mnist.csv'))
+
+        a.train_experiment_csv = os.path.abspath(os.path.join(TOP_DIR, 'new_mnist_clean/train_mnist.csv'))
+        a.test_experiment_csv = os.path.abspath(os.path.join(TOP_DIR,  'new_mnist_clean/test_mnist.csv'))
+
         a.models_output = os.path.abspath(os.path.join(TOP_DIR, model_name))
         # print("top_dir", TOP_DIR, "model name", model_name)
         # print("hhhhat", os.path.join(TOP_DIR, model_name, 'data/clean/train.csv'), "train", a.train)
