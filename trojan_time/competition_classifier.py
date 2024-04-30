@@ -214,9 +214,12 @@ if __name__ == "__main__":
 
 
     device = torch.device('mps')
+    # device = torch.device('mps')
+    # device = torch.device('cpu')
 
     # TODO update this to ur device
-    root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    # root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    root = "/home/dataset_storage/TopoTrojDetect/competition_dataset"
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
