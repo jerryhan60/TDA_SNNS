@@ -40,7 +40,7 @@ class xgb_classifier:
 
     def __init__(self, features: Dict,
                  labels: Dict,
-                 architecture_specific_params = None,
+                 classifier_params = None,
                  general_params = None
                  ):
         """ this needs to be able to load the data, run the classifier
@@ -56,11 +56,11 @@ class xgb_classifier:
         self.test_set = features['test']
         self.test_labels = labels['test']
 
-        self.architecture_specific_params = architecture_specific_params
+        self.classifier_params = classifier_params
         self.general_params = general_params
 
-        if self.architecture_specific_params is None or self.general_params is None:
-            self.architecture_specific_params = self.get_default_params()
+        if self.classifier_params is None or self.general_params is None:
+            self.get_default_params()
 
         self.model = None
 
@@ -107,7 +107,7 @@ class xgb_classifier:
         evallist = [(dtest, 'eval'), (dtrain, 'train')]
 
         bst = xgb.train(
-                self.architecture_specific_params,
+                self.classifier_params,
                 dtrain,
                 self.general_params["num_epochs"],
                 evals=evallist,
@@ -149,7 +149,7 @@ class xgb_classifier:
                         "thresholds": (T, b)
                         }
 
-            log.info("calculating thresholds throuh grid search")
+            # log.info("calculating thresholds through grid search")
             accs = []
             ces = []
             thresholds = []
@@ -182,8 +182,8 @@ class xgb_classifier:
                                      calc_thresholds=False
                                      )
 
-        print("train results: ", train_results)
-        print("test results: ", test_results)
+        # print("train results: ", train_results)
+        # print("test results: ", test_results)
 
         return train_results, test_results
 

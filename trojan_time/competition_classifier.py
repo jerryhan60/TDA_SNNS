@@ -25,6 +25,8 @@ from sklearn.metrics import roc_auc_score
 from competition_model_data import ModelBasePaths, ModelData
 from classifier_bin import xgb_classifier
 
+import multiprocessing
+
 def seed_everything(seed = 42):
     random.seed(seed)
     np.random.seed(seed)
@@ -304,12 +306,38 @@ if __name__ == "__main__":
     feature_train, feature_test = dat[train_ind], dat[test_ind]
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
-    x = xgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
-                          labels = {'train': gt_train, 'test': gt_test})
-    print("Training...")
-    x.train()
-    print("Evaluating")
-    x.test()
+    for gamma in [0, 1, 10, 20]:
+        
+        general_params = {
+            "num_epochs": 30*4,
+            "test_percentage": 0.1
+        }
+
+        classifier_params = {
+            'objective': 'binary:logistic',
+            'nthread': multiprocessing.cpu_count(),
+            'eval_metric':'error',
+            'device': "cuda",
+
+            'max_depth': 6,
+            'eta': 0.05,
+            'gamma': gamma,
+            'lambda': 0,
+            'alpha': 0,
+
+            'subsample': 0.7,
+        }
+        x = xgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
+                            labels = {'train': gt_train, 'test': gt_test},
+                            classifier_params=classifier_params,
+                            general_params=general_params)
+        # print("Training...")
+        x.train()
+        # print("Evaluating")
+        train_results, test_results = x.test()
+        print("Gamma", gamma)
+        print("Train results", train_results)
+        print("Test results", test_results)
     # train_xgboost(models)
 
 
