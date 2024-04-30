@@ -208,7 +208,7 @@ def run_crossval_xgb(feature, gt_train):
     # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, ax_evals=100, trials=trials)
 
     # _=fmin(xgb_crossval, hp_config, algo=tpe.suggest, max_evals=100, trials=trials)
-   max_evals = 20
+    max_evals = 20
 
     if max_evals < 100:
         log.warning(f"max evals is {max_evals}, not running at full fidelity!")
