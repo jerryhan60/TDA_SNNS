@@ -12,6 +12,10 @@ from typing import List, Dict, Any
 import logging
 from colorlog import ColoredFormatter
 
+import lightgbm as lgb
+
+from sklearn.metrics import accuracy_score, log_loss
+
 # log = logging.getLogger('pythonConfig')
 # def setup_logger():
 #     global log
@@ -28,6 +32,106 @@ from colorlog import ColoredFormatter
 #     log.addHandler(stream)
 
 # setup_logger()
+
+
+class lgb_classifier:
+
+    """
+        - get_default_params
+        - train
+        - test
+    """
+
+    def __init__(self, features: Dict,
+                 labels: Dict,
+                 classifier_params = None,
+                 general_params = None
+                 ):
+        """ this needs to be able to load the data, run the classifier
+            and have a method for running tests
+        """
+
+        self.features = features
+        self.labels = labels
+
+        self.train_set = lgb.Dataset(features['train'], label=labels['train'])
+        self.test_set = lgb.Dataset(features['test'], label=labels['test'])
+
+        self.classifier_params = classifier_params
+        self.general_params = general_params
+
+        if self.classifier_params is None or self.general_params is None:
+            self.get_default_params()
+
+        self.model = None
+
+    def get_default_params(self):
+
+        self.general_params = {
+            "num_epochs": 30*4,
+            "test_percentage": 0.1
+        }
+
+        self.classifier_params = {
+            'objective': 'binary',
+            'num_threads': multiprocessing.cpu_count(),
+            'metric': 'binary_error',
+            'device': "cpu",
+
+            'max_depth': 5,
+            'learning_rate': 0.05,
+            'lambda_l1': 0,
+            'lambda_l2': 0,
+
+            'bagging_fraction': 0.7,
+            # 'feature_fraction': 0.8, # TODO consider turning this on when using PSF features,
+                                       # but not when using topo features!
+        }
+
+
+    def train(self):
+
+        # if self.classifier_params['device'] != "gpu":
+            # logging.warning("you are not currently using GPU accel!")
+
+        if self.general_params is None:
+            logging.error("general_params not set!")
+            return None
+
+        bst = lgb.train(
+            self.classifier_params,
+            self.train_set,
+            num_boost_round=self.general_params["num_epochs"],
+            valid_sets=[self.test_set],
+            verbose_eval=False
+        )
+
+        self.model = bst
+
+        return bst
+
+    def test(self):
+        if self.model is None:
+            logging.error("model not trained! run model.train first")
+            return None
+
+        def eval_metrics(labels, data, thresholds = None):
+
+            y_pred = self.model.predict(data)
+
+            auc = roc_auc_score(labels, y_pred)
+            acc = accuracy_score(labels, y_pred >= 0.5)
+            ce = log_loss(labels, y_pred) 
+
+            return {
+                    "acc": acc,
+                    "auc": auc,
+                    "ce": ce
+                }
+        train_results = eval_metrics(self.labels['train'], self.features['train'])
+        test_results = eval_metrics(self.labels['test'], self.features['test'])                                   
+
+        return train_results, test_results
 
 
 class xgb_classifier:
@@ -186,5 +290,3 @@ class xgb_classifier:
         # print("test results: ", test_results)
 
         return train_results, test_results
-
-
