@@ -178,37 +178,6 @@ def featurize(models: List[ModelData]):
     }
 
 
-"""
-def train_xgboost(models: List[ModelData]):
-    TRAIN_TEST_SPLIT = 0.8
-    _x = featurize(models)
-    dat = _x['features']
-    gt_list = _x['labels']
-
-    N = len(gt_list)
-    n_train = int(TRAIN_TEST_SPLIT * N)
-    ind_reshuffle = np.random.choice(list(range(N)), N, replace=False)
-    train_ind = ind_reshuffle[:n_train]
-    test_ind = ind_reshuffle[n_train:]
-
-    feature_train, feature_test = dat[train_ind], dat[test_ind]
-    gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
-
-    log.info("beginning xgboost training")
-    best_model_list = run_crossval_xgb(np.array(feature_train), np.array(gt_train))
-
-
-    train_results = run_model_tests(feature_train, gt_train, best_model_list, calc_thresholds=True)
-    test_results = run_model_tests(feature_test, gt_test, best_model_list, thresholds=train_results['thresholds'])
-
-    # manual_restuls = run_model_tests(feature_train, gt_train, best_model_list, thresholds=[0.1, 0.0195])
-
-    print("train", train_results)
-    print("test", test_results)
-    # print("manual_restuls", manual_restuls)
-"""
-
-
 if __name__ == "__main__":
 
     device = torch.device('mps')
