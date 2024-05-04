@@ -60,9 +60,9 @@ def xgb_crossval(p):
     ################ added ################
     param['subsample']=0.7
     #param['colsample_bytree']=0.8
-
+    param['device'] = 'cuda'
     #param['tree_method']='gpu_hist' :(
-    log.warning("you are not currently using GPU accel!")
+    # log.warning("you are not currently using GPU accel!")
 
     acc = []
     auc = []

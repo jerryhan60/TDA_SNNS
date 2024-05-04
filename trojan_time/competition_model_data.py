@@ -28,6 +28,8 @@ import logging
 import copy
 import warnings
 
+from classifier_bin import xgb_classifier
+
 # ignore warnings from site-packages/torch/serialization.py # FIXME
 warnings.filterwarnings("ignore", module="torch.serialization")
 

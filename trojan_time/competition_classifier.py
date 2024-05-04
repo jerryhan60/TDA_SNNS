@@ -23,9 +23,11 @@ from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 
 from competition_model_data import ModelBasePaths, ModelData
-from classifier_bin import xgb_classifier
+from classifier_bin import xgb_classifier, lgb_classifier
 
 import multiprocessing
+
+import warnings 
 
 def seed_everything(seed = 42):
     random.seed(seed)
@@ -165,12 +167,8 @@ def featurize(models: List[ModelData]):
     psf_std_max=psf_feature_dat.std(dim=3).max(2)[0].view(len(gt_list), -1)
     psf_topk_max=psf_feature_dat.topk(k=min(3, n_classes), dim=3)[0].mean(2).max(2)[0].view(len(gt_list), -1)
     psf_feature_dat=torch.cat([psf_diff_max, psf_med_max, psf_std_max, psf_topk_max], dim=1)
-
-    # dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
-
-    dat=psf_feature_dat
     # dat = topo_feature.view(topo_feature.shape[0], -1)
-
+    dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
     dat=preprocessing.scale(dat)
     gt_list=torch.tensor(gt_list)
 
@@ -185,8 +183,8 @@ if __name__ == "__main__":
     device = torch.device('mps')
 
     # TODO update this to ur device
-    root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
-    # root = "/home/jerryhan/Documents/data"
+    # root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    root = "/home/jerryhan/Documents/data"
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
@@ -232,37 +230,52 @@ if __name__ == "__main__":
     feature_train, feature_test = dat[train_ind], dat[test_ind]
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
-    for gamma in [1]:
+    res = []
+
+    for gamma in [0.07368421052631578]:
 
         general_params = {
-            "num_epochs": 30*60,
-            "test_percentage": 0.2
+            "num_epochs": 50*10,
+            "test_percentage": 0.1
         }
 
+        
         classifier_params = {
-            'objective': 'binary:logistic',
-            'nthread': multiprocessing.cpu_count(),
-            'eval_metric':'error',
-            'device': "cuda",
+            'objective': 'binary',
+            'num_threads': multiprocessing.cpu_count(),
+            'metric': 'binary_error',
+            'device': "cpu",
 
-            'max_depth': 3,
-            'eta': 0.008,
-            'gamma': gamma,
-            'lambda': 2,
-            'alpha': 0.2,
+            'max_depth': 5,
+            'learning_rate': 0.05,
+            'lambda_l1': gamma,
+            'lambda_l2': 0,
+            'verbose': -1,
 
-            'subsample': 0.5,
+            'bagging_fraction': 0.5,
         }
-
-        model = xgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
+        warnings.filterwarnings('ignore')
+        model = lgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
                             labels = {'train': gt_train, 'test': gt_test},
                             classifier_params=classifier_params,
                             general_params=general_params)
+        
+
+        #model = lgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
+        #                    labels = {'train': gt_train, 'test': gt_test})
         # print("Training...")
         model.train()
         # print("Evaluating")
         train_results, test_results = model.test()
         print("Gamma", gamma)
-        print("Train results", train_results)
-        print("Test results", test_results)
-
+        print("Train", train_results)
+        print("Test", test_results)
+        res.append([train_results, test_results])
+        
+        # print("Gamma", gamma)
+        #print("Train results", train_results)
+        #print("Test results", test_results)
+    #for r in res:
+        #print("Train", r[0])
+        #print("Test", r[1])
+    # train_xgboost(models)
