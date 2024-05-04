@@ -19,6 +19,8 @@ from datetime import date
 from tqdm import tqdm
 import glob
 import time
+import persim
+from tqdm import tqdm
 
 from rich import print, inspect
 from typing import List, Dict, Any
@@ -29,6 +31,8 @@ import copy
 import warnings
 
 from classifier_bin import xgb_classifier
+import sys
+sys.path.append("./TopoTrojDetection/")
 
 # ignore warnings from site-packages/torch/serialization.py # FIXME
 warnings.filterwarnings("ignore", module="torch.serialization")
@@ -87,7 +91,7 @@ class ModelData:
         """
 
         if not self.load_fast:
-            self.model = torch.load(join(self.base_paths.model_folder_path, 'model.pt'), map_location=device)
+            self.model = torch.load(join(self.base_paths.model_folder_path, 'model.pt'), map_location='mps')
             self.model.eval()
 
         self.config = json.load(open(join(self.base_paths.model_folder_path, 'config.json')))
@@ -114,7 +118,72 @@ class ModelData:
         if not self.load_fast and os.path.exists(join(self.base_paths.cache_dir_path, 'PD_list.pkl')):
             self.PD_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PD_list.pkl'), 'rb'))
 
+    def calc_topo_feature(self, PH: List, dim: int)-> Dict:
+        """
+        Compute topological feature from the persistent diagram.
+        Input args:
+            PH (List) : Persistent diagram
+            dim (int) : dimension to be focused on
+        Return:
+            Dictionary contains topological feature
+        """
+        pd_dim = PH[dim]
+        if dim == 0:
+            pd_dim = pd_dim[:-1]
+        pd_dim = np.array(pd_dim)
+        betti = len(pd_dim)
+        ave_persis = sum(pd_dim[:, 1] - pd_dim[:, 0]) / betti if betti > 0 else 0
+        ave_midlife = (sum((pd_dim[:, 0] + pd_dim[:, 1]) / 2) / betti) if betti > 0 else 0
+        med_midlife = np.median((pd_dim[:, 0] + pd_dim[:, 1]) / 2) if betti > 0 else 0
+        max_persis = (pd_dim[:, 1] - pd_dim[:, 0]).max() if betti > 0 else 0
+        top_5_persis = np.mean(np.sort(pd_dim[:, 1] - pd_dim[:, 0])[-5:]) if betti > 0 else 0
 
+        ave_death_time = sum(pd_dim[:, 1]) / betti if betti > 0 else 0
+
+        topo_feature_dict = {"betti_" + str(dim): betti,
+                            "avepersis_" + str(dim): ave_persis,
+                            "avemidlife_" + str(dim): ave_midlife,
+                            "maxmidlife_" + str(dim): med_midlife,
+                            "maxpersis_" + str(dim): max_persis,
+                            "toppersis_" + str(dim): top_5_persis,
+                            "avedeath_" + str(dim): ave_death_time}
+        return topo_feature_dict
+    
+    def load_PH(self):
+        print("starting load_PH 1")
+        self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
+        PH_sample = random.choice(self.PH_list)
+        print(len(self.PH_list))
+        distances_0 = []
+        distances_1 = []
+        for i in tqdm(range(len(self.PH_list))):
+            # print(i)
+            PH = self.PH_list[i] 
+            distances_0.append((i, persim.sliced_wasserstein(PH_sample[0], PH[0])))
+            distances_1.append((i, persim.sliced_wasserstein(PH_sample[1], PH[1])))
+
+        return (distances_0, distances_1)
+
+    def recalc_fv(self):
+        self.load_PH()
+        topo_feature_pos=torch.zeros(
+            len(self.PH_list),
+            14
+        )
+        for i in range(len(self.PH_list)):
+            PH = self.PH_list[i]
+            clean_feature_0=self.calc_topo_feature(PH, 0)
+            clean_feature_1=self.calc_topo_feature(PH, 1)
+            topo_feature=[]
+            for k in sorted(list(clean_feature_0)):
+                topo_feature.append(clean_feature_0[k])
+            for k in sorted(list(clean_feature_1)):
+                topo_feature.append(clean_feature_1[k])
+            topo_feature=torch.tensor(topo_feature)
+            topo_feature_pos[i, :]=topo_feature
+        topo_feature_pos = topo_feature_pos.reshape(5, 196, 14)
+        self.fv['topo_feature_pos'] = topo_feature_pos
+    
     def calculate_features_from_weights(self):
         raise NotImplementedError
 

@@ -105,10 +105,13 @@ class lgb_classifier:
             valid_sets=[self.test_set],
             verbose_eval=False
         )
-
         self.model = bst
-
-        return bst
+        self.cv_results = lgb.cv(self.classifier_params, self.train_set, 
+                                 num_boost_round=self.general_params["num_epochs"],
+                                 nfold=5, metrics='auc', verbose_eval=False)
+        # print("Cross-val", max(self.cv_results['auc-mean']))
+        
+        return max(self.cv_results['auc-mean'])
 
     def test(self):
         if self.model is None:
