@@ -4,6 +4,7 @@ import random
 import numpy as np
 from rich import print, inspect
 from rich.progress import track
+from tqdm import tqdm
 import torch
 import random
 import logging
@@ -24,6 +25,9 @@ import ripser
 import persim
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy import sparse
+import rustworkx as rx
+import igraph as ig
+import networkx as nx
 
 from topological_feature_extractor import getGreedyPerm, getApproxSparseDM
 
@@ -74,7 +78,7 @@ root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_data
 models_dir = join(root, "all_models")
 cache_dir = join(root, "calculated_features_cache")
 
-models = load_all_models(models_dir, cache_dir, load_fast=True)
+models = load_all_models(models_dir, cache_dir)
 
 # filter for only resnets
 models = [x for x in models if x.architecture == "resnet50"]
@@ -85,8 +89,10 @@ clean = [x for x in models if x.label == 0]
 
 print(len(triggered), len(clean))
 min_len = min(len(triggered), len(clean))
+
 triggered = triggered[:min_len]
 clean = clean[:min_len]
+
 models = triggered + clean
 np.random.shuffle(models)
 print(len(models), "\n\n\n")
@@ -97,6 +103,156 @@ ft = local_featurize(models)
 # get all the clean models from the output of local_featurize
 clean_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 0])
 dirty_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 1])
+
+
+def graph_assortativity(): # GOOD
+
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    print("starting to graph convert")
+    clean_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in clean_adj_mats]
+    dirty_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in dirty_adj_mats]
+    print("finished graph convert")
+
+    sample = len(clean_graphs)
+
+    NUM_NEURONS = 1467
+    # model_shape = [300, 300, 300, 300, 300]
+    # bin
+    NUM_BINS = 2
+    model_shape = [(NUM_NEURONS + NUM_BINS + 1)//NUM_BINS for _ in range(NUM_BINS)]
+
+    c_f = []
+    for x in tqdm(clean_graphs[:sample]):
+        # label each node by what layer in resnet50 it corresponds to
+        # assume that the nodes are ordered by layer,
+        # and label each node with the layer it corresponds to, by looking at the shape of the model
+        types1 = []
+        for node in range(x.vcount()):
+            for i, layer in enumerate(model_shape):
+                if node < sum(model_shape[:i+1]):
+                    types1.append(i)
+                    break
+
+        c_f.append(x.assortativity(types1, directed=False))
+
+    d_f = []
+    for x in tqdm(dirty_graphs[:sample]):
+        types1 = []
+        for node in range(x.vcount()):
+            for i, layer in enumerate(model_shape):
+                if node < sum(model_shape[:i+1]):
+                    types1.append(i)
+                    break
+
+        d_f.append(x.assortativity(types1, directed=False))
+
+    plt.hist(c_f, alpha=0.5, label='clean', color='green')
+    plt.hist(d_f, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+# graph_assortativity()
+
+def graph_assortativity_degree(): # GOOD
+
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    print("starting to graph convert")
+    clean_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in clean_adj_mats]
+    dirty_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in dirty_adj_mats]
+    print("finished graph convert")
+
+    sample = len(clean_graphs)
+
+    NUM_NEURONS = 1467
+
+    c_f = []
+    for x in tqdm(clean_graphs[:sample]):
+        c_f.append(x.assortativity_degree(directed=False))
+
+    d_f = []
+    for x in tqdm(dirty_graphs[:sample]):
+        d_f.append(x.assortativity_degree(directed=False))
+
+    plt.hist(c_f, alpha=0.5, label='clean', color='green')
+    plt.hist(d_f, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+# graph_assortativity_degree()
+
+def graph_density():
+    print("WARNING WARNIGN this function doesn't use density but EDGE COUNT")
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    print("starting to graph convert")
+    clean_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in clean_adj_mats]
+    dirty_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in dirty_adj_mats]
+    print("finished graph convert")
+
+    sample = len(clean_graphs)
+
+    c_f = []
+    for x in tqdm(clean_graphs[:sample]):
+        c_f.append(x.ecount())
+
+    d_f = []
+    for x in tqdm(dirty_graphs[:sample]):
+        d_f.append(x.ecount()) # TODO this *should* be density, but smt is fricked here
+
+    plt.hist(c_f, alpha=0.5, label='clean', color='green')
+    plt.hist(d_f, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+# graph_density()
+
+def avg_clustering():
+
+    SAMPLE = 20
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    print("starting to graph convert")
+    clean_graphs = [nx.from_numpy_matrix(x) for x in clean_adj_mats[:SAMPLE]]
+    dirty_graphs = [nx.from_numpy_matrix(x) for x in dirty_adj_mats[:SAMPLE]]
+    # dirty_graphs = [ig.Graph.Weighted_Adjacency(x.tolist(), mode="undirected") for x in dirty_adj_mats]
+    print("finished graph convert")
+
+    c_f = []
+    for x in tqdm(clean_graphs):
+        c_f.append(nx.average_clustering(x))
+
+    d_f = []
+    for x in tqdm(dirty_graphs):
+        d_f.append(nx.average_clustering(x))
+
+    plt.hist(c_f, alpha=0.5, label='clean', color='green')
+    plt.hist(d_f, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+avg_clustering()
 
 def plot_persistence_diagram():
 
@@ -181,7 +337,7 @@ def histogram_params():
         plt.show()
 
 
-histogram_params()
+# histogram_params()
 
 
 
