@@ -13,7 +13,7 @@ from colorlog import ColoredFormatter
 import time
 from typing import List, Dict, Any
 from pdb import set_trace as bp
-
+from tqdm import tqdm
 
 import sys
 sys.path.append("./TopoTrojDetection/")
@@ -80,7 +80,6 @@ def load_all_models(models_dir, cache_dir, percentage=1.0):
                           skip_model_base=False,
                           load_fast=True
                           )
-
         models.append(model)
 
     log.info(f"loaded {len(models)} models in {time.time() - start:.2f} seconds")
@@ -154,10 +153,17 @@ def featurize(models: List[ModelData]):
     CLASSES = 5 # FIXME don't hardcode this
     n_classes = CLASSES
     fv_list = [x.fv for x in models]
+    # ph_list = [x.PH_list for x in models]
+    # exit(0)
     gt_list = [x.label for x in models]
 
     psf_feature=torch.cat([fv_list[i]['psf_feature_pos'].unsqueeze(0) for i in range(len(fv_list))])
     topo_feature = torch.cat([fv_list[i]['topo_feature_pos'].unsqueeze(0) for i in range(len(fv_list))])
+
+    corr_feature = []
+    for i in range(len(fv_list)):
+        corr_mat = fv_list[i]['correlation_matrix']
+        top_k_values, top_k_indices = torch.from_numpy(fv_list[i]['correlation_matrix']).topk(100)
 
     topo_feature[np.where(topo_feature==np.Inf)]=1
     n, _, nEx, fnW, fnH, nStim, C = psf_feature.shape
@@ -167,8 +173,19 @@ def featurize(models: List[ModelData]):
     psf_std_max=psf_feature_dat.std(dim=3).max(2)[0].view(len(gt_list), -1)
     psf_topk_max=psf_feature_dat.topk(k=min(3, n_classes), dim=3)[0].mean(2).max(2)[0].view(len(gt_list), -1)
     psf_feature_dat=torch.cat([psf_diff_max, psf_med_max, psf_std_max, psf_topk_max], dim=1)
+
+    # print(topo_feature.shape)
+    # topo_feature_mean = torch.mean(topo_feature, dim=[1,2])
+    # topo_feature_std = torch.std(topo_feature, dim=[1,2])
+    # topo_stat_features = torch.cat([topo_feature_mean, topo_feature_std], dim=1)
+    # print(topo_stat_features)
+    #print(topo_stat_features.shape)
+    #print(psf_feature_dat.shape)
+
     # dat = topo_feature.view(topo_feature.shape[0], -1)
+    # dat=torch.cat([topo_stat_features, psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
     dat=torch.cat([psf_feature_dat, topo_feature.view(topo_feature.shape[0], -1)], dim=1)
+    # print(dat.shape)
     dat=preprocessing.scale(dat)
     gt_list=torch.tensor(gt_list)
 
@@ -188,15 +205,19 @@ if __name__ == "__main__":
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
-    models = load_all_models(models_dir, cache_dir
-                             # , percentage=0.2
-                             )
+    models = load_all_models(models_dir, cache_dir, percentage=1)
 
     # filter for only resnets
     models = [x for x in models if x.architecture == "resnet50"]
+    ph_outlier = models[0].load_PH()
+    
+    #for model in tqdm(models):
+    #    model.recalc_fv()
     # models = [x for x in models if x.architecture != "resnet50"]
     print(models[0])
-    # models = models[:50]
+    # print(models[0].fv['topo_feature_pos'].shape)
+    # print(models[0].fv['topo_feature_pos'].shape)
+    # models = models[:2]
 
     triggered = [x for x in models if x.label == 1]
     clean = [x for x in models if x.label == 0]
@@ -219,6 +240,7 @@ if __name__ == "__main__":
     TRAIN_TEST_SPLIT = 0.8
     _x = featurize(models)
     dat = _x['features']
+    print(dat.shape)
     gt_list = _x['labels']
 
     N = len(gt_list)
@@ -231,14 +253,12 @@ if __name__ == "__main__":
     gt_train, gt_test = gt_list[train_ind], gt_list[test_ind]
 
     res = []
-
-    for gamma in [0.07368421052631578]:
-
+    # optimal gamma: 0.07368421052631578
+    for i in range(1000):
         general_params = {
-            "num_epochs": 50*10,
+            "num_epochs": random.randint(100, 500),
             "test_percentage": 0.1
         }
-
         
         classifier_params = {
             'objective': 'binary',
@@ -246,13 +266,16 @@ if __name__ == "__main__":
             'metric': 'binary_error',
             'device': "cpu",
 
-            'max_depth': 5,
-            'learning_rate': 0.05,
-            'lambda_l1': gamma,
-            'lambda_l2': 0,
+            'max_depth': random.randint(2, 5),
+            'learning_rate': random.uniform(0.01, 0.1),
+            'lambda_l1': random.uniform(0, 0.2),
+            'lambda_l2': random.uniform(0, 0.2),
+            'min_gain_to_split': random.uniform(0, 0.2),
             'verbose': -1,
 
+            'feature_fraction': 0.9,
             'bagging_fraction': 0.5,
+            'bagging_freq': 1
         }
         warnings.filterwarnings('ignore')
         model = lgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
@@ -264,13 +287,18 @@ if __name__ == "__main__":
         #model = lgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
         #                    labels = {'train': gt_train, 'test': gt_test})
         # print("Training...")
-        model.train()
+        x = model.train()
+        print(general_params, classifier_params)
+        print("Cross AUC", x)
         # print("Evaluating")
         train_results, test_results = model.test()
-        print("Gamma", gamma)
         print("Train", train_results)
         print("Test", test_results)
-        res.append([train_results, test_results])
+        res.append({
+            "general_params" : general_params,
+            "classifier_params" : classifier_params,
+            "crossval_auc": x
+        })
         
         # print("Gamma", gamma)
         #print("Train results", train_results)
