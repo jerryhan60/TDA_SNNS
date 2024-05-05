@@ -2,6 +2,7 @@ import os
 from os.path import join
 import random
 import numpy as np
+import pickle
 from rich import print, inspect
 from rich.progress import track
 from tqdm import tqdm
@@ -20,6 +21,7 @@ import xgboost as xgb
 from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 from matplotlib import pyplot as plt
+from matplotlib import use
 import multiprocessing
 import ripser
 import persim
@@ -107,6 +109,39 @@ ft = local_featurize(models)
 clean_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 0])
 dirty_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 1])
 
+# compile persistence diagrams
+ph_list = [x.PH_list for x in models]
+
+def preprocess_diagram_list_for_gtda(diagram_list: List[List[np.ndarray]]):
+
+    """
+
+    Input:
+    diagram_list - List[ List[ np.ndarray, np.ndarray] ] - list of persistance diagrams corresponding to
+    a single model. A persistence diagram is a list of np.ndarrays of shape (num_features, 2), where the ith
+    list is the ith homology group. Assumes two homology groups, H0 and H1.
+
+    Output:
+    bdq_ordered_diagram_list - List[np.ndarray] - (num_diagrams, num_features, 3) list of diagrams, where each
+    point in the output diagram is of the form [birth_time, death_time, homology_group]
+
+    """
+
+    bdq_ordered_diagram_list = []
+    for diagram in diagram_list:
+        ones_H0 = np.ones((len(diagram[0]), 1))
+        ones_H1 = np.ones((len(diagram[1]), 1))
+        H0 = np.hstack((np.array(diagram[0]), ones_H0 * 0))
+        H1 = np.hstack((np.array(diagram[1]), ones_H1 * 1))
+
+        combined_array = np.array([np.vstack((H0, H1))])
+
+        bdq_ordered_diagram_list.append(combined_array)
+
+    return bdq_ordered_diagram_list
+
+
+
 def amplitude_feature_from_diagram_list(
         diagram_list: List[List[np.ndarray]],
         amplitude_metric: str,
@@ -123,15 +158,16 @@ def amplitude_feature_from_diagram_list(
     of shape (num_features, 2), where the ith list is the ith homology group. Assumes
     two homology groups, H0 and H1.
 
-    amplitude_metric - str - the metric to use for the amplitude calculation
+    amplitude_metric - str - the metric to use for the amplitude calculation. Refer
+    to the link below for a list of available metrics.
 
     metric_params - Dict[str, Any] | None - *optional, parameters for the gtda metric
 
     fit_params - Dict[str, Any] | None - *optional, parameters for the gtda fit_transform
 
     Refer to www.giotto-ai.github.io/gtda-docs/latest/modules/generated/diagrams/features/
-    gtda.diagrams.Amplitude.html#gtda.diagrams.Amplitude for details on metric_params and
-    fit_params.
+    gtda.diagrams.Amplitude.html#gtda.diagrams.Amplitude for details on amplitude_metric,
+    metric_params, and fit_params.
 
     Output:
 
@@ -148,12 +184,12 @@ def amplitude_feature_from_diagram_list(
     # preprocessing
     bdq_ordered_diagram_list = []
     for diagram in diagram_list:
-        ones_x = np.ones((len(diagram[0]), 1))
-        ones_y = np.ones((len(diagram[1]), 1))
-        x_with_index = np.hstack((np.array(diagram[0]), ones_x * 0))
-        y_with_index = np.hstack((np.array(diagram[1]), ones_y * 1))
+        ones_H0 = np.ones((len(diagram[0]), 1))
+        ones_H1 = np.ones((len(diagram[1]), 1))
+        H0 = np.hstack((np.array(diagram[0]), ones_H0 * 0))
+        H1 = np.hstack((np.array(diagram[1]), ones_H1 * 1))
 
-        combined_array = np.array([np.vstack((x_with_index, y_with_index))])
+        combined_array = np.array([np.vstack((H0, H1))])
 
         if fit_params is not None:
             metric = amplitude.fit_transform(X=combined_array, **fit_params)[0]
@@ -169,12 +205,34 @@ def amplitude_feature_from_diagram_list(
 #         diagram_list=ph_list[0], amplitude_metric="wasserstein", metric_params={"p": 3}, fit_params=None)
 # print(wasserstein_amplitude)
 # exit()
-ph_list = [x.PH_list for x in models]
-persistence_image = amplitude_feature_from_diagram_list(
-        diagram_list=ph_list[0], amplitude_metric="persistence_image"
-        )
-print(persistence_image)
+# persistence_image = amplitude_feature_from_diagram_list(
+#         diagram_list=ph_list[0], amplitude_metric="persistence_image"
+#         )
+# print(persistence_image)
 
+def plot_persistence_image(diagram: np.ndarray, homology_group: int = 0):
+
+    """
+
+    Input:
+
+    persistence_image - np.ndarray - (num_features, 3) persistence image
+
+    Output:
+
+    None - plots the persistence image
+
+    """
+
+    persistence_image = gtda.diagrams.PersistenceImage()
+    result = persistence_image.fit_transform(diagram)
+    a = persistence_image.plot(result, homology_dimension_idx=homology_group)
+
+    # uncomment to save the plot
+    a.write_image("persistence_image.png")
+
+# diagram = pickle.load(open("persistence_diagram.pkl", "rb"))
+# plot_persistence_image(diagram[0], homology_group=1)
 
 def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]]):
 
@@ -199,12 +257,12 @@ def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]])
     # preprocessing
     bdq_ordered_diagram_list = []
     for diagram in diagram_list:
-        ones_x = np.ones((len(diagram[0]), 1))
-        ones_y = np.ones((len(diagram[1]), 1))
-        x_with_index = np.hstack((np.array(diagram[0]), ones_x * 0))
-        y_with_index = np.hstack((np.array(diagram[1]), ones_y * 1))
+        ones_H0 = np.ones((len(diagram[0]), 1))
+        ones_H1 = np.ones((len(diagram[1]), 1))
+        x_with_index = np.hstack((np.array(diagram[0]), ones_H0 * 0))
+        y_with_index = np.hstack((np.array(diagram[1]), ones_H1 * 1))
 
-        combined_array = np.array([np.vstack((x_with_index, y_with_index))])
+        combined_array = np.array([np.vstack((H0, H1))])
         wasserstein_distance = wasserstein_amplitude.fit_transform(combined_array)[0]
         bdq_ordered_diagram_list.append(wasserstein_distance)
 
