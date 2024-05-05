@@ -106,11 +106,11 @@ class lgb_classifier:
             verbose_eval=False
         )
         self.model = bst
-        self.cv_results = lgb.cv(self.classifier_params, self.train_set, 
+        self.cv_results = lgb.cv(self.classifier_params, self.train_set,
                                  num_boost_round=self.general_params["num_epochs"],
                                  nfold=5, metrics='auc', verbose_eval=False)
         # print("Cross-val", max(self.cv_results['auc-mean']))
-        
+
         return max(self.cv_results['auc-mean'])
 
     def test(self):
@@ -124,7 +124,7 @@ class lgb_classifier:
 
             auc = roc_auc_score(labels, y_pred)
             acc = accuracy_score(labels, y_pred >= 0.5)
-            ce = log_loss(labels, y_pred) 
+            ce = log_loss(labels, y_pred)
 
             return {
                     "acc": acc,
@@ -132,7 +132,7 @@ class lgb_classifier:
                     "ce": ce
                 }
         train_results = eval_metrics(self.labels['train'], self.features['train'])
-        test_results = eval_metrics(self.labels['test'], self.features['test'])                                   
+        test_results = eval_metrics(self.labels['test'], self.features['test'])
 
         return train_results, test_results
 

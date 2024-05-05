@@ -148,7 +148,7 @@ class ModelData:
                             "toppersis_" + str(dim): top_5_persis,
                             "avedeath_" + str(dim): ave_death_time}
         return topo_feature_dict
-    
+
     def load_PH(self):
         print("starting load_PH 1")
         self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
@@ -158,7 +158,7 @@ class ModelData:
         distances_1 = []
         for i in tqdm(range(len(self.PH_list))):
             # print(i)
-            PH = self.PH_list[i] 
+            PH = self.PH_list[i]
             distances_0.append((i, persim.sliced_wasserstein(PH_sample[0], PH[0])))
             distances_1.append((i, persim.sliced_wasserstein(PH_sample[1], PH[1])))
 
@@ -183,7 +183,7 @@ class ModelData:
             topo_feature_pos[i, :]=topo_feature
         topo_feature_pos = topo_feature_pos.reshape(5, 196, 14)
         self.fv['topo_feature_pos'] = topo_feature_pos
-    
+
     def calculate_features_from_weights(self):
         raise NotImplementedError
 

@@ -29,6 +29,8 @@ import rustworkx as rx
 import igraph as ig
 import networkx as nx
 
+import gtda.diagrams
+
 from topological_feature_extractor import getGreedyPerm, getApproxSparseDM
 
 
@@ -73,12 +75,13 @@ def local_featurize(models: List[ModelData]):
 device = torch.device('mps')
 
 # TODO update this to ur device
-root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+# root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
 # root = "/home/jerryhan/Documents/data"
+root = "/home/dataset_storage/TopoTrojDetect/competition_dataset"
 models_dir = join(root, "all_models")
 cache_dir = join(root, "calculated_features_cache")
 
-models = load_all_models(models_dir, cache_dir)
+models = load_all_models(models_dir, cache_dir, percentage=0.1)
 
 # filter for only resnets
 models = [x for x in models if x.architecture == "resnet50"]
@@ -103,6 +106,109 @@ ft = local_featurize(models)
 # get all the clean models from the output of local_featurize
 clean_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 0])
 dirty_fts = np.array([ft["features"][i] for i in range(len(models)) if ft["labels"][i] == 1])
+
+def amplitude_feature_from_diagram_list(
+        diagram_list: List[List[np.ndarray]],
+        amplitude_metric: str,
+        metric_params: Dict[str, Any] | None = None,
+        fit_params: Dict[str, Any] | None = None
+        ):
+
+    """
+
+    Input:
+
+    diagram_list - List[ List[ np.ndarray, np.ndarray] ] - list of persistance diagrams
+    corresponding to a single model. A persistence diagram is a list of np.ndarrays
+    of shape (num_features, 2), where the ith list is the ith homology group. Assumes
+    two homology groups, H0 and H1.
+
+    amplitude_metric - str - the metric to use for the amplitude calculation
+
+    metric_params - Dict[str, Any] | None - *optional, parameters for the gtda metric
+
+    fit_params - Dict[str, Any] | None - *optional, parameters for the gtda fit_transform
+
+    Refer to www.giotto-ai.github.io/gtda-docs/latest/modules/generated/diagrams/features/
+    gtda.diagrams.Amplitude.html#gtda.diagrams.Amplitude for details on metric_params and
+    fit_params.
+
+    Output:
+
+    bdq_ordered_diagram_list - List[np.ndarray] - (num_diagrams, homology_group) list of
+    amplitude metrics of each diagram in the list with the trivial diagonal diagram
+
+    """
+
+    if metric_params is not None:
+        amplitude = gtda.diagrams.Amplitude(metric=amplitude_metric, metric_params=metric_params)
+    else:
+        amplitude = gtda.diagrams.Amplitude(metric=amplitude_metric)
+
+    # preprocessing
+    bdq_ordered_diagram_list = []
+    for diagram in diagram_list:
+        ones_x = np.ones((len(diagram[0]), 1))
+        ones_y = np.ones((len(diagram[1]), 1))
+        x_with_index = np.hstack((np.array(diagram[0]), ones_x * 0))
+        y_with_index = np.hstack((np.array(diagram[1]), ones_y * 1))
+
+        combined_array = np.array([np.vstack((x_with_index, y_with_index))])
+
+        if fit_params is not None:
+            metric = amplitude.fit_transform(X=combined_array, fit_params=fit_params)[0]
+        else:
+            metric = amplitude.fit_transform(X=combined_array, fit_params=fit_params)[0]
+
+        bdq_ordered_diagram_list.append(metric)
+
+    return bdq_ordered_diagram_list
+
+# ph_list = [x.PH_list for x in models]
+# wasserstein_amplitude = amplitude_feature_from_diagram_list(
+#         diagram_list=ph_list[0], amplitude_metric="wasserstein", metric_params={"p": 3}, fit_params=None)
+# print(wasserstein_amplitude)
+# exit()
+
+
+def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]]):
+
+    """
+
+    Input:
+
+    diagram_list - List[ List[ np.ndarray, np.ndarray] ] - list of persistance diagrams
+    corresponding to a single model. A persistence diagram is a list of np.ndarrays
+    of shape (num_features, 2), where the ith list is the ith homology group. Assumes
+    two homology groups, H0 and H1.
+
+    Output:
+
+    bdq_ordered_diagram_list - List[np.ndarray] - (num_diagrams, homology_group) list of
+    wasserstein distances of each diagram in the list with the trivial diagonal diagram
+
+    """
+
+    wasserstein_amplitude = gtda.diagrams.Amplitude(metric="wasserstein")
+
+    # preprocessing
+    bdq_ordered_diagram_list = []
+    for diagram in diagram_list:
+        ones_x = np.ones((len(diagram[0]), 1))
+        ones_y = np.ones((len(diagram[1]), 1))
+        x_with_index = np.hstack((np.array(diagram[0]), ones_x * 0))
+        y_with_index = np.hstack((np.array(diagram[1]), ones_y * 1))
+
+        combined_array = np.array([np.vstack((x_with_index, y_with_index))])
+        wasserstein_distance = wasserstein_amplitude.fit_transform(combined_array)[0]
+        bdq_ordered_diagram_list.append(wasserstein_distance)
+
+    return bdq_ordered_diagram_list
+
+# ph_list = [x.PH_list for x in models]
+# print(ph_list[0][0])
+# wasserstein_distances = wasserstein_distance_from_diagram_list(ph_list[0])
+# print(wasserstein_distances)
 
 
 def graph_assortativity(): # GOOD
@@ -252,7 +358,7 @@ def avg_clustering():
     plt.legend(loc='upper right')
     plt.show()
 
-avg_clustering()
+# avg_clustering()
 
 def plot_persistence_diagram():
 
