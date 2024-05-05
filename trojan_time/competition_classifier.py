@@ -27,7 +27,7 @@ from classifier_bin import xgb_classifier, lgb_classifier
 
 import multiprocessing
 
-import warnings 
+import warnings
 
 def seed_everything(seed = 42):
     random.seed(seed)
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     device = torch.device('mps')
 
     # TODO update this to ur device
-    # root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
-    root = "/home/jerryhan/Documents/data"
+    root = "/Users/huxley/dataset_storage/snn_tda_mats/LENET_MODELS/competition_dataset"
+    # root = "/home/jerryhan/Documents/data"
     models_dir = join(root, "all_models")
     cache_dir = join(root, "calculated_features_cache")
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # filter for only resnets
     models = [x for x in models if x.architecture == "resnet50"]
     ph_outlier = models[0].load_PH()
-    
+
     #for model in tqdm(models):
     #    model.recalc_fv()
     # models = [x for x in models if x.architecture != "resnet50"]
@@ -254,12 +254,11 @@ if __name__ == "__main__":
 
     res = []
     # optimal gamma: 0.07368421052631578
-    for i in range(1000):
+    for i in range(100):
         general_params = {
             "num_epochs": random.randint(100, 500),
             "test_percentage": 0.1
         }
-        
         classifier_params = {
             'objective': 'binary',
             'num_threads': multiprocessing.cpu_count(),
@@ -282,7 +281,7 @@ if __name__ == "__main__":
                             labels = {'train': gt_train, 'test': gt_test},
                             classifier_params=classifier_params,
                             general_params=general_params)
-        
+
 
         #model = lgb_classifier(features = {'train': feature_train, 'test': feature_test}, \
         #                    labels = {'train': gt_train, 'test': gt_test})
@@ -299,7 +298,7 @@ if __name__ == "__main__":
             "classifier_params" : classifier_params,
             "crossval_auc": x
         })
-        
+
         # print("Gamma", gamma)
         #print("Train results", train_results)
         #print("Test results", test_results)
