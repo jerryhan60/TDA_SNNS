@@ -289,8 +289,6 @@ def plot_betti_curve(betti_curve: List[np.ndarray], fitBettiCurve: gtda.diagrams
 # plot_betti_curve(betti_curve=curves[0], fitBettiCurve=fitBettiCurve)
 
 
-
-
 def plot_persistence_image(diagram: np.ndarray, homology_group: int = 0):
 
     """
@@ -339,8 +337,8 @@ def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]])
     for diagram in diagram_list:
         ones_H0 = np.ones((len(diagram[0]), 1))
         ones_H1 = np.ones((len(diagram[1]), 1))
-        x_with_index = np.hstack((np.array(diagram[0]), ones_H0 * 0))
-        y_with_index = np.hstack((np.array(diagram[1]), ones_H1 * 1))
+        H0 = np.hstack((np.array(diagram[0]), ones_H0 * 0))
+        H1 = np.hstack((np.array(diagram[1]), ones_H1 * 1))
 
         combined_array = np.array([np.vstack((H0, H1))])
         wasserstein_distance = wasserstein_amplitude.fit_transform(combined_array)[0]
@@ -353,6 +351,47 @@ def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]])
 # print(ph_list[0][0])
 # wasserstein_distances = wasserstein_distance_from_diagram_list(ph_list[0])
 # print(wasserstein_distances)
+
+def persistence_entropies_from_diagram_list(
+        diagram_list: List[List[np.ndarray]],
+        normalize: bool = False,
+        nan_fill_value: float = -1.0,
+        n_jobs: int | None = None
+        ):
+
+    """
+
+    Input:
+
+    diagram_list - List[ List[ np.ndarray, np.ndarray] ] - list of persistance diagrams
+    corresponding to a single model. A persistence diagram is a list of np.ndarrays
+    of shape (num_features, 2), where the ith list is the ith homology group. Assumes
+    two homology groups, H0 and H1.
+
+    Output:
+
+    bdq_ordered_diagram_list - List[np.ndarray] - (num_diagrams, homology_group) list of
+    persistence entropies of each diagram in the list
+    """
+
+    persistence_entropy = gtda.diagrams.PersistenceEntropy(normalize=normalize, nan_fill_value=nan_fill_value, n_jobs=n_jobs)
+
+    # preprocessing
+    bdq_ordered_diagram_list = []
+    for diagram in diagram_list:
+        ones_H0 = np.ones((len(diagram[0]), 1))
+        ones_H1 = np.ones((len(diagram[1]), 1))
+        H0 = np.hstack((np.array(diagram[0]), ones_H0 * 0))
+        H1 = np.hstack((np.array(diagram[1]), ones_H1 * 1))
+
+        combined_array = np.array([np.vstack((H0, H1))])
+        entropy = persistence_entropy.fit_transform(combined_array)
+        bdq_ordered_diagram_list.append(entropy)
+
+    return bdq_ordered_diagram_list
+
+# entropies = persistence_entropies_from_diagram_list(ph_list[0])
+# print(entropies)
 
 
 def graph_assortativity(): # GOOD
