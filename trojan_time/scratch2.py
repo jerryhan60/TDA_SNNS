@@ -156,9 +156,9 @@ def amplitude_feature_from_diagram_list(
         combined_array = np.array([np.vstack((x_with_index, y_with_index))])
 
         if fit_params is not None:
-            metric = amplitude.fit_transform(X=combined_array, fit_params=fit_params)[0]
+            metric = amplitude.fit_transform(X=combined_array, **fit_params)[0]
         else:
-            metric = amplitude.fit_transform(X=combined_array, fit_params=fit_params)[0]
+            metric = amplitude.fit_transform(X=combined_array)[0]
 
         bdq_ordered_diagram_list.append(metric)
 
@@ -169,6 +169,11 @@ def amplitude_feature_from_diagram_list(
 #         diagram_list=ph_list[0], amplitude_metric="wasserstein", metric_params={"p": 3}, fit_params=None)
 # print(wasserstein_amplitude)
 # exit()
+ph_list = [x.PH_list for x in models]
+persistence_image = amplitude_feature_from_diagram_list(
+        diagram_list=ph_list[0], amplitude_metric="persistence_image"
+        )
+print(persistence_image)
 
 
 def wasserstein_distance_from_diagram_list(diagram_list: List[List[np.ndarray]]):
