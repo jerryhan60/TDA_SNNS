@@ -113,8 +113,9 @@ class ModelData:
 
         self.fv = pkl.load(open(join(self.base_paths.cache_dir_path, 'fv.pkl'), 'rb'))
 
-        if not self.load_fast:
-            self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
+        self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
+        # if not self.load_fast:
+        #     self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
 
         self.PD_list = None
         if not self.load_fast and os.path.exists(join(self.base_paths.cache_dir_path, 'PD_list.pkl')):
