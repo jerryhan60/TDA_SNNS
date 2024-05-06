@@ -12,6 +12,7 @@ import pandas as pd
 import cv2
 from sklearn.metrics import roc_auc_score
 from sklearn import preprocessing
+from sklearn.covariance import EmpiricalCovariance
 import xgboost as xgb
 import argparse
 import pickle as pkl
@@ -21,6 +22,7 @@ import glob
 import time
 import persim
 from tqdm import tqdm
+from scipy.spatial import distance
 
 from rich import print, inspect
 from typing import List, Dict, Any
@@ -148,7 +150,7 @@ class ModelData:
                             "toppersis_" + str(dim): top_5_persis,
                             "avedeath_" + str(dim): ave_death_time}
         return topo_feature_dict
-    
+
     def load_PH(self):
         print("starting load_PH 1")
         self.PH_list = pkl.load(open(join(self.base_paths.cache_dir_path, 'PH_list.pkl'), 'rb'))
@@ -158,14 +160,14 @@ class ModelData:
         distances_1 = []
         for i in tqdm(range(len(self.PH_list))):
             # print(i)
-            PH = self.PH_list[i] 
+            PH = self.PH_list[i]
             distances_0.append((i, persim.sliced_wasserstein(PH_sample[0], PH[0])))
             distances_1.append((i, persim.sliced_wasserstein(PH_sample[1], PH[1])))
 
         return (distances_0, distances_1)
 
     def recalc_fv(self):
-        self.load_PH()
+        # self.load_PH()
         topo_feature_pos=torch.zeros(
             len(self.PH_list),
             14
@@ -183,7 +185,7 @@ class ModelData:
             topo_feature_pos[i, :]=topo_feature
         topo_feature_pos = topo_feature_pos.reshape(5, 196, 14)
         self.fv['topo_feature_pos'] = topo_feature_pos
-    
+
     def calculate_features_from_weights(self):
         raise NotImplementedError
 
@@ -198,6 +200,52 @@ class ModelData:
         ] if getattr(self, x) is not None]}
         """
 
+    def trim_features(self):
+       topo_feature_pos = self.fv['topo_feature_pos']
+       # print(topo_feature_pos.shape)
+       samples = 4
+       trimmed_topo_ft = torch.zeros(5, samples, 12)
+
+       def sort_vectors_by_outlierness(vectors):
+           # Compute the mean vector
+           vectors = vectors.numpy()
+
+           mean_vector = np.mean(vectors, axis=0)
+           std_vector = np.std(vectors, axis = 0)
+           # Compute the covariance matrix
+           cov_matrix = EmpiricalCovariance().fit(vectors)
+
+
+           # Compute the Mahalanobis distance of each vector
+           mahalanobis_dist = distance.cdist(vectors, mean_vector.reshape(1, -1), 'mahalanobis', VI=cov_matrix.covariance_)
+
+           # Sort the vectors by their Mahalanobis distance
+           sorted_indices = np.argsort(mahalanobis_dist, axis=0)
+           sorted_indices = sorted_indices.flatten()[::-1]
+           vv = vectors[sorted_indices]
+           mean_vector = mean_vector.reshape(1,12)
+           # std_vector = std_vector.reshape(1,12)
+           # vv = np.concatenate((mean_vector, std_vector, vv), axis=0)
+           vv = np.concatenate((mean_vector, vv), axis=0)
+           return vv
+
+
+       def protocol(eg_idx, class_idx):
+           ft_eg = topo_feature_pos[eg_idx,:,:]
+
+           def map_idx(idx):
+               h = idx % 14
+               w = idx//14
+               return w, h
+
+           v = sort_vectors_by_outlierness(ft_eg)
+           return v[:samples,]
+
+
+       for i in range(5):
+           trimmed_topo_ft[i,:,:]= torch.from_numpy(protocol(0, 1))
+
+       self.fv['topo_feature_pos'] = trimmed_topo_ft
 
 if __name__ == '__main__':
     seed = 42

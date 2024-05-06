@@ -25,6 +25,10 @@ import ripser
 import persim
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy import sparse
+
+from scipy.sparse.linalg import eigsh
+import scipy.sparse as sp
+
 import rustworkx as rx
 import igraph as ig
 import networkx as nx
@@ -81,17 +85,17 @@ cache_dir = join(root, "calculated_features_cache")
 models = load_all_models(models_dir, cache_dir)
 
 # filter for only resnets
-models = [x for x in models if x.architecture == "resnet50"]
-# models = [x for x in models if x.architecture != "resnet50"]
+# models = [x for x in models if x.architecture == "resnet50"]
+models = [x for x in models if x.architecture != "resnet50"]
 
-triggered = [x for x in models if x.label == 1]
-clean = [x for x in models if x.label == 0]
+full_triggered = [x for x in models if x.label == 1]
+full_clean = [x for x in models if x.label == 0]
 
-print(len(triggered), len(clean))
-min_len = min(len(triggered), len(clean))
+print(len(full_triggered), len(full_clean))
+min_len = min(len(full_triggered), len(full_clean))
 
-triggered = triggered[:min_len]
-clean = clean[:min_len]
+triggered = full_triggered[:min_len]
+clean = full_clean[:min_len]
 
 models = triggered + clean
 np.random.shuffle(models)
@@ -252,7 +256,61 @@ def avg_clustering():
     plt.legend(loc='upper right')
     plt.show()
 
-avg_clustering()
+# avg_clustering()
+
+
+def explore_adj_mat_similarity():
+
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    sample = 40
+
+    c_f = []
+    for x in tqdm(clean_adj_mats[:sample]):
+        c_f.append(calc_spectral_gap(x))
+
+    d_f = []
+    for x in tqdm(dirty_adj_mats[:sample]):
+        d_f.append(calc_spectral_gap(x))
+
+    plt.hist(c_f, alpha=0.5, label='clean', color='green')
+    plt.hist(d_f, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+
+# explore_adj_mat_similarity()
+
+def calc_spectral_gap(mat):
+    # eigvals = np.linalg.eigvals(mat)
+    # eigvals = np.sort(eigvals)
+
+    eigvals, _ = eigsh(mat, k=2, which='LA')
+    return np.abs(eigvals[-1] - eigvals[-2])
+
+
+def are_mats_the_same():
+
+    clean_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in full_clean]
+    dirty_adj_mats = [np.array(x.fv["correlation_matrix"], dtype='float64') for x in full_triggered]
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+
+    clean_sums = [np.sum(x) for x in clean_adj_mats]
+    dirty_sums = [np.sum(x) for x in dirty_adj_mats]
+
+    plt.hist(clean_sums, bins=200, alpha=0.5, label='clean', color='green')
+    plt.hist(dirty_sums, bins=200, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
 
 def plot_persistence_diagram():
 
@@ -317,7 +375,92 @@ def plot_persistence_diagram():
 
     plt.show()
 
+def check_long_distance():
+    clean_adj_mats = np.array([np.array(x.fv["correlation_matrix"], dtype='float64') for x in full_clean])
+    dirty_adj_mats = np.array([np.array(x.fv["correlation_matrix"], dtype='float64') for x in full_triggered])
 
+    np.random.shuffle(clean_adj_mats)
+    np.random.shuffle(dirty_adj_mats)
+
+    # make all the nans 0
+    for mat in [*clean_adj_mats, *dirty_adj_mats]:
+        mat[np.isnan(mat)] = 0
+        # zero out the diagonal
+        np.fill_diagonal(mat, 0)
+
+        # trucate to only the first 1300 neurons
+        # mat = mat[:1300, :1300]
+
+    # get the average clean and dirty matrices,
+    clean_avg = np.sum(clean_adj_mats, axis=0) / len(clean_adj_mats)
+    dirty_avg = np.sum(dirty_adj_mats, axis=0) / len(dirty_adj_mats)
+
+    LAYER_SIZES = [250, 300, 300, 250, 12]
+
+    # get the layer that correponds to each node in the graph
+    def get_layer(n):
+        for i, layer in enumerate(LAYER_SIZES):
+            if n < sum(LAYER_SIZES[:i+1]):
+                return i
+
+
+    # construct a matrix, where each entry is: abs(get_layer(i) - get_layer(j)) * 6
+    # this is the distance between the layers of the nodes
+    Z = 6
+    layer_dist = np.zeros(clean_avg.shape)
+    for i in range(clean_avg.shape[0]):
+        for j in range(clean_avg.shape[1]):
+            # print(get_layer(i), get_layer(j))
+            # layer_dist[i, j] = abs(get_layer(i) - get_layer(j)) * Z
+            layer_dist[i, j] = abs(i//150 - j//150) * Z
+
+    # print(layer_dist)
+
+
+    """
+    # print(clean_avg)
+    plt.matshow(clean_avg - dirty_avg)
+    plt.title("clean")
+
+    plt.matshow(dirty_avg)
+    plt.title("dirty")
+    plt.show()
+
+    plt.matshow(clean_avg, title="clean")
+    plt.matshow(dirty_avg, title="dirty")
+    plt.show()
+    """
+
+    SAMPLE_CLEAN = 4
+    SAMPLE_DIRTY = 5
+    # pick SAMPLE many clean and dirty
+    mats = [ *[(x, "c") for x in clean_adj_mats[:SAMPLE_CLEAN]], *[(x, "d") for x in dirty_adj_mats[:SAMPLE_DIRTY]] ]
+    np.random.shuffle(mats)
+
+    grid_size = int(np.ceil(np.sqrt(len(mats))))
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(5 * grid_size, 5 * grid_size))
+    axes = axes.flatten()
+
+    """
+    dirty_sum = [np.sum((m * layer_dist)[:1300, :1300]) for m in dirty_adj_mats]
+    clean_sum = [np.sum((m * layer_dist)[:1300, :1300]) for m in clean_adj_mats]
+
+    plt.hist(clean_sum, bins=200, alpha=0.5, label='clean', color='green')
+    plt.hist(dirty_sum, bins=200, alpha=0.5, label='dirty', color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+    """
+
+    for ax, m in zip(axes, mats):
+        cax = ax.matshow((m[0] * layer_dist)[:1300, :1300], cmap='viridis')
+        ax.set_title(m[1])
+        # fig.colorbar(cax, ax=ax)
+
+
+    plt.tight_layout()
+    plt.show()
+
+check_long_distance()
 
 # plot_persistence_diagram()
 
@@ -338,6 +481,40 @@ def histogram_params():
 
 
 # histogram_params()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
